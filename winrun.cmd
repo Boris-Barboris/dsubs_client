@@ -1,0 +1,1 @@
+dub -c prod --arch=x86_64 -b debug

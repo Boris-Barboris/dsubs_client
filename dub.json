@@ -1,0 +1,31 @@
+{
+	"name": "dsubs_client",
+	"targetType": "executable",
+	"version": "0.3.0",
+	"authors": [
+		"Boris-Barboris"
+	],
+	"dependencies": {
+		"gfm:math": "~>6.2.7",
+		"derelict-al": "~>1.0.3",
+		"derelict-sfml2": { "path": "../DerelictSFML2" },
+		"dsubs_common": { "path": "../dsubs_common" },
+		"standardpaths": "~>0.8.1"
+	},
+	"buildRequirements": [
+		"requireBoundsCheck"
+	],
+	"libs-windows": ["user32"],
+	"configurations": [
+		{
+			"name": "dev"
+		},
+		{
+			"name": "prod",
+			"versions": ["prod"]
+		}
+	],
+	"description": "DSubs multiplayer subsim client",
+	"copyright": "Copyright (C) 2017-2021, Alexander Baranin",
+	"copyFiles-windows": ["libs-win-x64/*.dll"]
+}
