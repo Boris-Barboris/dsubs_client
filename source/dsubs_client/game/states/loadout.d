@@ -496,16 +496,16 @@ final class LoadoutState: GameState
 		return btn;
 	}
 
-	private Label buildCampaignNameLabel(AvailableCampaign campaign)
+	private Button buildCampaignNameButton(AvailableCampaign campaign)
 	{
 		// generate scenario selection buttons
-		Label lbl = builder(new Label()).content(campaign.name).
+		Button btn = builder(new Button()).content(campaign.name).
 			fontSize(MISSION_FONT).fixedSize(vec2i(1, MISSION_FONT + 6)).
-			build();
+			htextAlign(HTextAlign.LEFT).build();
 		if (!campaign.completed)
-			lbl.fontColor = INCOMPLETE_COLOR;
-		lbl.onMouseEnter += (oldReciever) {
-			// on click we generate scenario description text box.
+			btn.fontColor = INCOMPLETE_COLOR;
+		btn.onClick += {
+			// on click we generate campaign description text box.
 			string descContent = campaign.name ~ "\n\n" ~ campaign.description;
 			TextBox descBox = builder(new TextBox()).fontSize(DESCRIPTION_FONT).
 				content(descContent).build();
@@ -515,7 +515,7 @@ final class LoadoutState: GameState
 			// deactivate 'to loadout' button in the footer
 			m_footerDiv.setChild(filler(), 2);
 		};
-		return lbl;
+		return btn;
 	}
 
 	private void buildScenarioSelectionUi()
@@ -568,7 +568,7 @@ final class LoadoutState: GameState
 				// handle campaigns with nested scenarios
 				foreach (AvailableCampaign camp; campaigns)
 				{
-					missionButtons ~= buildCampaignNameLabel(camp);
+					missionButtons ~= buildCampaignNameButton(camp);
 					foreach (AvailableScenario scen; camp.scenarios)
 						missionButtons ~= buildScenarioSelectionBtn(scen);
 				}
