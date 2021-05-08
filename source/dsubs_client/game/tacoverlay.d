@@ -1665,6 +1665,8 @@ final class TacticalContactElement: OverlayElementWithHover
 		}
 		if (btn == sfMouseRight && !m_panning)
 		{
+			if (tacowner.inMerge)
+				tacowner.cancelMerge();
 			Button[] buttons = commonContactContextMenu(m_contact);
 			// add merge to button
 			Button mbtn = builder(new Button()).fontSize(15).content("merge").build();
