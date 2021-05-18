@@ -1150,7 +1150,10 @@ final class PlayerSubIcon: OverlayElement
 		KinematicSnapshot snap;
 		if (m_sub.getInterpolatedSnapshot(snap))
 		{
-			double velRot = m_to.world2screenRot(courseAngle(snap.velocity));
+			vec2d prograde = snap.velocity;
+			if (prograde == vec2d(0.0, 0.0))
+				prograde = 1e-3 * courseVector(snap.rotation);
+			double velRot = m_to.world2screenRot(courseAngle(prograde));
 			double velLen = 5.0 + snap.velocity.length;
 			// LineShape is horizontal when transform rotation is zero, so we need
 			// to add PI_2 in order to match it with dsubs rotation frame
