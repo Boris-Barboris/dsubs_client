@@ -161,6 +161,8 @@ final class ClientContact
 		}
 	}
 
+	/// Last added ray. This field is not updated by data point deletion or updates,
+	/// only addition.
 	mixin Readonly!(ClientContactData*, "lastRay");
 
 	/// collection of all data of this contact

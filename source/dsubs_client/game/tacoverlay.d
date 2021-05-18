@@ -126,18 +126,21 @@ final class ContactOverlayShapeCahe
 		return res;
 	}
 
-	LineShape rayDataLine(int sensorIdx, usecs_t sampleTime)
+	LineShape rayDataLine(int sensorIdx, usecs_t sampleTime, usecs_t zeroFadeTime)
 	{
-		sfColor rayColor = dimRayColor(sensorIdx, sampleTime);
+		sfColor rayColor = dimRayColor(sensorIdx, sampleTime, zeroFadeTime);
 		return new LineShape(vec2d(0, 0), vec2d(0, 0), rayColor, 0.5);
 	}
 
-	static sfColor dimRayColor(int sensorIdx, usecs_t sampleTime)
+	static sfColor dimRayColor(int sensorIdx, usecs_t sampleTime, usecs_t zeroFadeTime)
 	{
 		sfColor res = rotateColor(sfColor(155, 244, 66, 80), sensorIdx * -65);
-		float age = (Game.simState.extrapolatedServerTime - sampleTime) / 1e6f;
+		float age = (zeroFadeTime - sampleTime) / 1e6f;
 		if (age > 0.0f)
-			res.a -= min(55.0f, age / 6.0f).to!ubyte;
+		{
+			float dimming = min(55.0f, age / 6.0f);
+			res.a -= dimming.to!ubyte;
+		}
 		return res;
 	}
 
@@ -2149,7 +2152,8 @@ final class RayDataTacticalElement: DataTacticalElement
 	{
 		assert(data.type == DataType.Ray);
 		super(owner, data);
-		m_mainShape = ctcOverlayCache.rayDataLine(data.source.sensorIdx, data.time);
+		m_mainShape = ctcOverlayCache.rayDataLine(data.source.sensorIdx, data.time,
+			getZeroFadeTime());
 		size = vec2i(0, 0);
 		mouseTransparent = true;
 		onPreDraw();	/// we rely on m_mainShape being initialized after construction
@@ -2162,23 +2166,33 @@ final class RayDataTacticalElement: DataTacticalElement
 
 	override void updateFromData() {}
 
+	private usecs_t getZeroFadeTime()
+	{
+		ClientContact contact = Game.simState.contactManager.get(data.ctcId);
+		ClientContactData* cd = contact.lastRay;
+		if (cd)
+			return cd.time;
+		else
+			return Game.simState.extrapolatedServerTime;
+	}
+
 	override void onPreDraw()
 	{
 		vec2d worldPos = data.data.ray.origin;
 		vec2d screenPos = owner.world2screenPos(worldPos);
 		m_mainShape.setPoints(screenPos, screenPos -
 			1e8 * courseVector(-data.data.ray.bearing), true);
+		// smear color fading over frames
+		if (Game.render.frameCounter % (60 * 3) == (data.id % 16))
+		{
+			m_mainShape.color = ctcOverlayCache.dimRayColor(
+				data.source.sensorIdx, data.time, getZeroFadeTime());
+		}
 	}
 
 	override void draw(Window wnd, long usecsDelta)
 	{
 		super.draw(wnd, usecsDelta);
-		// smear over frames
-		if (Game.render.frameCounter % (60 * 3) == (data.id % 16))
-		{
-			m_mainShape.color = ctcOverlayCache.dimRayColor(
-				data.source.sensorIdx, data.time);
-		}
 		m_mainShape.render(wnd);
 	}
 }
