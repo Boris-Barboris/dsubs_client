@@ -213,6 +213,11 @@ class ContactDataOverlayElement: OverlayElementWithHover
 
 	mixin Readonly!(ClientContactData*, "data");
 
+	@property ClientContact contact()
+	{
+		return Game.simState.contactManager.get(m_data.ctcId);
+	}
+
 	/// When the contact data updates from CIC message, this method is called;
 	abstract void updateFromData();
 }
@@ -1962,6 +1967,7 @@ final class WaterfallRaySampleElement: DataTacticalElement
 			};
 		res ~= btn;
 		}
+		res ~= classifyAndDescribeContextButtons(contact);
 		return res;
 	}
 
@@ -2171,7 +2177,6 @@ final class RayDataTacticalElement: DataTacticalElement
 
 	private usecs_t getZeroFadeTime()
 	{
-		ClientContact contact = Game.simState.contactManager.get(data.ctcId);
 		ClientContactData* cd = contact.lastRay;
 		if (cd)
 			return cd.time;

@@ -466,13 +466,12 @@ final class ClientContactManager
 }
 
 
-/// Generate buttons, that contain common actions to perform on contact
-Button[] commonContactContextMenu(ClientContact ctc)
+Button[] classifyAndDescribeContextButtons(ClientContact ctc)
 {
 	Button[] res;
-	Button btn;
 	// classification
 	Button[] classifications;
+	Button btn;
 	foreach (ctype; EnumMembers!ContactType)
 	{
 		btn = builder(new Button()).fontSize(15).content(ctype.to!string).build();
@@ -526,6 +525,16 @@ Button[] commonContactContextMenu(ClientContact ctc)
 		descriptionTextField.selectAll();
 	};
 	res ~= describebtn;
+	return res;
+}
+
+
+/// Generate buttons, that contain common actions to perform on contact
+Button[] commonContactContextMenu(ClientContact ctc)
+{
+	Button[] res;
+	Button btn;
+	res ~= classifyAndDescribeContextButtons(ctc);
 	// trimming
 	Button[] trimmingBtns;
 	foreach (int secsToLeave; [30, 60, 180, 300, 900])
