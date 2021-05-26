@@ -200,7 +200,8 @@ final class BackendConMaintainer
 		{
 			try
 			{
-				Socket clientSock = new Socket(AddressFamily.INET, SocketType.STREAM, ProtocolType.IP);
+				Socket clientSock = new Socket(AddressFamily.INET,
+					SocketType.STREAM, ProtocolType.IP);
 				AddressInfo[] addrs;
 				version (prod)
 				{
@@ -226,9 +227,9 @@ final class BackendConMaintainer
 			catch (Exception ex)
 			{
 				error(ex.msg);
-				// flood protection
-				Thread.sleep(seconds(10));
 			}
+			// flood protection
+			Thread.sleep(seconds(10));
 		}
 	}
 }

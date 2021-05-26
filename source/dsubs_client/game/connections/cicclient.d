@@ -86,14 +86,15 @@ final class CICClientConnection: ProtocolConnection!CICProtocol
 		void delegate(CICClientConnection c) onSuccess,
 		void delegate(Exception ex) onFailure)
 	{
-		Socket clientSock = new Socket(AddressFamily.INET, SocketType.STREAM, ProtocolType.IP);
-		auto addr = parseUrl(url);
-		info("Attempting to connect to CIC server ", addr);
+		info("Attempting to connect to CIC server ", url);
+		Socket clientSock = new Socket(AddressFamily.INET,
+			SocketType.STREAM, ProtocolType.IP);
+		scope(failure) clientSock.close();
 		Thread thread = new Thread(()
 		{
 			try
 			{
-				scope(failure) clientSock.close();
+				auto addr = parseUrl(url);
 				clientSock.connect(addr);
 				auto con = new CICClientConnection(clientSock);
 				con.m_url = url;
