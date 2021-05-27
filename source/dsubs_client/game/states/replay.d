@@ -30,6 +30,7 @@ import dsubs_common.api.entities;
 import dsubs_client.common;
 import dsubs_client.core.utils;
 import dsubs_client.core.window;
+import dsubs_client.input.hotkeymanager;
 import dsubs_client.render.shapes;
 import dsubs_client.game;
 import dsubs_client.game.cameracontroller;
@@ -43,6 +44,7 @@ import dsubs_client.gui;
 private
 {
 	enum int BTN_FONT = 25;
+	enum int SIM_ID_FONT = 16;
 }
 
 
@@ -56,6 +58,8 @@ final class ReplayState: GameState
 		ReplayOverlay m_overlay;
 		ContactOverlayShapeCahe m_shapeCache;
 		Slider m_timeSlider;
+		TextField m_simIdBox;
+		__gshared static string s_currentSimId = "main_arena";
 		Label m_curTimeLabel;
 		size_t m_curSlice = 0;
 	}
@@ -108,9 +112,28 @@ final class ReplayState: GameState
 			}
 		};
 
+		void delegate(long, Modifier) hotkeyHandler =
+			(long usecsDelta, Modifier curMods) {
+				enum float KB_TIME_SPEED = 8.0f;
+				float timeDeltaTracker = 0.0f;
+				if (m_slices.length == 0)
+					return;
+				if (sfKeyboard_isKeyPressed(sfKeyA))
+					timeDeltaTracker -= usecsDelta * 1e-6 * KB_TIME_SPEED;
+				if (sfKeyboard_isKeyPressed(sfKeyD))
+					timeDeltaTracker += usecsDelta * 1e-6 * KB_TIME_SPEED;
+				if (timeDeltaTracker != 0.0f)
+				{
+					timeDeltaTracker /= m_slices.length;
+					m_timeSlider.value = fmax(0.0f, fmin(1.0f,
+						m_timeSlider.value + timeDeltaTracker));
+				}
+			};
+		Game.hotkeyManager.addHoldkey(hotkeyHandler);
+
 		TextField dateField = builder(new TextField()).content(
 			m_day.toISOExtString()).symbolFilter(&numericSymbFilter).
-			fixedSize(vec2i(200, 10)).fontSize(BTN_FONT).build;
+			fixedSize(vec2i(170, 10)).fontSize(BTN_FONT).build;
 		Button changeDateBtn = builder(new Button(ButtonType.ASYNC)).content("load day").
 			fontSize(BTN_FONT).fixedSize(vec2i(150, 10)).build;
 
@@ -118,7 +141,8 @@ final class ReplayState: GameState
 		{
 			try
 			{
-				Game.bconm.con.sendMessage(immutable ReplayGetDataReq("main_arena",
+				s_currentSimId = m_simIdBox.content.str;
+				Game.bconm.con.sendMessage(immutable ReplayGetDataReq(s_currentSimId,
 					Date.fromISOExtString(dateField.content.str).toISOExtString()));
 			}
 			catch (Exception ex)
@@ -128,8 +152,13 @@ final class ReplayState: GameState
 			}
 		};
 
+		Label simIdLabel = builder(new Label()).content("simulator_id:").
+			fontSize(SIM_ID_FONT).fixedSize(vec2i(110, 10)).build;
+		m_simIdBox = builder(new TextField()).content(s_currentSimId).
+			fontSize(SIM_ID_FONT).fixedSize(vec2i(180, 10)).build;
+
 		Div mainDiv = vDiv([
-			builder(hDiv([dateField, changeDateBtn, filler(), m_curTimeLabel])).fixedSize(
+			builder(hDiv([dateField, changeDateBtn, simIdLabel, m_simIdBox, filler(), m_curTimeLabel])).fixedSize(
 				vec2i(10, BTN_FONT + 5)).backgroundColor(COLORS.simPanelBgnd).build,
 			filler(),
 			m_timeSlider]);
