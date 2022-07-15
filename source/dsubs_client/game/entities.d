@@ -296,20 +296,11 @@ final class Tube
 		weaponParams[val.type] = val;
 	}
 
-	@property void marchCourse(float rhs)
+	@property void course(float rhs)
 	{
 		assert(!isNaN(rhs));
 		WeaponParamValue val;
-		val.type = WeaponParamType.marchCourse;
-		val.course = rhs;
-		weaponParams[val.type] = val;
-	}
-
-	@property void activeCourse(float rhs)
-	{
-		assert(!isNaN(rhs));
-		WeaponParamValue val;
-		val.type = WeaponParamType.activeCourse;
+		val.type = WeaponParamType.course;
 		val.course = rhs;
 		weaponParams[val.type] = val;
 	}

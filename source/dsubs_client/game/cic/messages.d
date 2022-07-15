@@ -39,7 +39,7 @@ struct CICLoginRes
 {
 	__gshared const int g_marshIdx;
 	@MaxLenAttr(32) immutable(ubyte)[] dbHash;	/// entity database hash (SHA256)
-	int apiVersion = 11;
+	int apiVersion = 12;
 }
 
 /// CIC client sends this to receive entity DB

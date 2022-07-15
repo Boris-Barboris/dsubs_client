@@ -197,7 +197,7 @@ final class TubeUI
 	void updateAimFieldsFromTube()
 	{
 		string marchCourseContent;
-		WeaponParamValue* wpv = WeaponParamType.marchCourse in m_tube.weaponParams;
+		WeaponParamValue* wpv = WeaponParamType.course in m_tube.weaponParams;
 		if (wpv)
 			marchCourseContent = format("%.1f", -wpv.course.compassAngle.rad2dgr);
 		m_courseTextField.content = marchCourseContent;
@@ -217,8 +217,7 @@ final class TubeUI
 		m_courseTextField.onKeyReleased += (k) {
 			if (m_courseTextField.content.length == 1)
 			{
-				m_tube.weaponParams.remove(WeaponParamType.marchCourse);
-				m_tube.weaponParams.remove(WeaponParamType.activeCourse);
+				m_tube.weaponParams.remove(WeaponParamType.course);
 			}
 			else
 			{
@@ -228,8 +227,7 @@ final class TubeUI
 					if (!isNaN(newTgt))
 					{
 						float radTgt = -newTgt.dgr2rad;
-						m_tube.marchCourse = radTgt;
-						m_tube.activeCourse = radTgt;
+						m_tube.course = radTgt;
 					}
 				}
 				catch (Exception e) {}

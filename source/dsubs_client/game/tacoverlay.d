@@ -2256,7 +2256,7 @@ final class WeaponProjectionTrace: OverlayElement
 		Transform2D trans = new Transform2D();
 		trans.position = m_tube.transform.wposition;
 		trans.rotation = m_tube.transform.wrotation;
-		auto param = WeaponParamType.marchCourse in m_tube.weaponParams;
+		auto param = WeaponParamType.course in m_tube.weaponParams;
 		float course = clampAngle(param ? param.course : trans.rotation);
 		float travelled = 0.0f;
 		float speed = m_tube.weaponParams[WeaponParamType.marchSpeed].speed;
@@ -2424,7 +2424,7 @@ final class WeaponAimHandle: OverlayElementWithHover
 	override void onPreDraw()
 	{
 		Transform2D tubeTrans = m_tube.transform;
-		auto param = WeaponParamType.marchCourse in m_tube.weaponParams;
+		auto param = WeaponParamType.course in m_tube.weaponParams;
 		float course = clampAngle(param ? param.course : tubeTrans.wrotation);
 		float activationRange = m_tube.weaponParams[WeaponParamType.activationRange].range;
 
@@ -2474,8 +2474,7 @@ final class WeaponAimHandle: OverlayElementWithHover
 			float clampedActivRange = m_tube.activationRangeLimits.clamp(delta.length);
 			float course = courseAngle(delta);
 			m_tube.activationRange = clampedActivRange;
-			m_tube.marchCourse = course;
-			m_tube.activeCourse = course;
+			m_tube.course = course;
 			m_tubeUi.updateAimFieldsFromTube();
 		}
 	}
