@@ -142,6 +142,8 @@ private:
 	mixin(passToCICMixin!(SonarStreamRes));
 	mixin(passToCICMixin!(SimFlowEndRes));
 	mixin(passToCICMixin!(TubeStateUpdateRes));
+	mixin(passToCICMixin!(WireGuidanceStateRes));
+	mixin(passToCICMixin!(WireGuidanceLostRes));
 	mixin(passToCICMixin!(AmmoRoomStateUpdateRes));
 	mixin(passToCICMixin!(ScenarioGoalUpdateRes));
 	mixin(passToCICMixin!(MapOverlayUpdateRes));

@@ -266,6 +266,49 @@ final class CICServer
 		m_listener.broadcast(cast(immutable) CICTubeStateUpdateRes(res));
 	}
 
+	void handleCICWireGuidanceActivateReq(CICWireGuidanceActivateReq req)
+	{
+		synchronized(m_state.rsMut)
+		{
+			if (m_dead)
+				return;
+		}
+		m_bcon.sendMessage(cast(immutable WireGuidanceActivateReq) req);
+	}
+
+	void handleCICWireGuidanceUpdateParamsReq(CICWireGuidanceUpdateParamsReq req)
+	{
+		synchronized
+		{
+			synchronized(m_state.rsMut)
+			{
+				if (m_dead)
+					return;
+				m_state.handleWireGuidanceUpdateParamsReq(req);
+			}
+			m_bcon.sendMessage(cast(immutable WireGuidanceUpdateParamsReq) req);
+			m_listener.broadcast(cast(immutable) req);
+		}
+	}
+
+	void handleWireGuidanceStateRes(WireGuidanceStateRes res)
+	{
+		synchronized(m_state.rsMut)
+		{
+			m_state.handleWireGuidanceStateRes(res);
+		}
+		m_listener.broadcast(cast(immutable) CICWireGuidanceStateRes(res));
+	}
+
+	void handleWireGuidanceLostRes(WireGuidanceLostRes res)
+	{
+		synchronized(m_state.rsMut)
+		{
+			m_state.handleWireGuidanceLostRes(res);
+		}
+		m_listener.broadcast(cast(immutable) CICWireGuidanceLostRes(res));
+	}
+
 	void handleAmmoRoomStateUpdateRes(AmmoRoomStateUpdateRes res)
 	{
 		synchronized(m_state.rsMut)

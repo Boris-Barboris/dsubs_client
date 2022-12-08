@@ -382,8 +382,33 @@ private:
 	{
 		synchronized(Game.mainMutexWriter)
 		{
+			// trace("CICTubeStateUpdateRes received: ", msg.res);
 			Game.simState.playerSub.tube(msg.res.tube.tubeId).
 				updateFromFullState(msg.res.tube);
+		}
+	}
+
+	void h_wireGuidanceStateRes(CICWireGuidanceStateRes msg)
+	{
+		synchronized(Game.mainMutexWriter)
+		{
+			trace("CICWireGuidanceStateRes received");
+		}
+	}
+
+	void h_wireGuidanceLostRes(CICWireGuidanceLostRes msg)
+	{
+		synchronized(Game.mainMutexWriter)
+		{
+			trace("CICWireGuidanceLostRes received");
+		}
+	}
+
+	void h_wireGuidanceUpdateParamsReq(CICWireGuidanceUpdateParamsReq msg)
+	{
+		synchronized(Game.mainMutexWriter)
+		{
+			trace("CICWireGuidanceUpdateParamsReq received");
 		}
 	}
 

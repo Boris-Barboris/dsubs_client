@@ -128,6 +128,8 @@ private:
 	mixin(passToServerMixin!(CICListenDirReq));
 	mixin(passToServerMixin!(CICEmitPingReq));
 	mixin(passToServerMixin!(CICCreateContactFromDataReq));
+	mixin(passToServerMixin!(CICWireGuidanceActivateReq));
+	mixin(passToServerMixin!(CICWireGuidanceUpdateParamsReq));
 
 	mixin(passToServerMixin!(CICContactUpdateTypeReq)("handleCICContactUpdateReq"));
 	mixin(passToServerMixin!(CICContactUpdateSolutionReq)("handleCICContactUpdateReq"));

@@ -2285,7 +2285,8 @@ final class WeaponProjectionTrace: OverlayElement
 			LineShape shape = m_shapes[shapeIdx];
 			vec2d point1 = trans.wposition;
 			vec2d point2;
-			// consume fuel
+			// consume fuel. Speed is estimated to be linearly dependent on
+			// throttle.
 			fuel -= INTEGRATION_STEP * fuelSpent(speed / fullThrottleSpd, fuelExponent);
 			assert(!isNaN(fuel));
 			// find point2

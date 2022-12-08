@@ -152,6 +152,30 @@ struct CICLaunchTubeReq
 	LaunchTubeReq req;
 }
 
+struct CICWireGuidanceUpdateParamsReq
+{
+	__gshared const int g_marshIdx;
+	WireGuidanceUpdateParamsReq req;
+}
+
+struct CICWireGuidanceActivateReq
+{
+	__gshared const int g_marshIdx;
+	WireGuidanceActivateReq req;
+}
+
+struct CICWireGuidanceStateRes
+{
+	__gshared const int g_marshIdx;
+	WireGuidanceStateRes res;
+}
+
+struct CICWireGuidanceLostRes
+{
+	__gshared const int g_marshIdx;
+	WireGuidanceLostRes res;
+}
+
 // proxied from backend
 struct CICTubeStateUpdateRes
 {

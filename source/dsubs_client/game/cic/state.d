@@ -27,6 +27,7 @@ import core.sync.condition: Condition;
 
 import dsubs_common.api.messages;
 import dsubs_common.api.marshalling;
+import dsubs_common.containers.array;
 import dsubs_client.game.cic.persistence;
 import dsubs_client.game.cic.protocol;
 import dsubs_client.game.cic.messages;
@@ -45,6 +46,8 @@ final class CICState: Persistable
 	private
 	{
 		ReconnectStateRes m_recState;
+		// we have to track wire guidance states and all their parameters
+		WireGuidanceFullState*[string] m_wireGuidanceStates;
 		/// condition to block on when waiting for availability of m_recState
 		Condition m_recStateCond;
 		bool m_recStateInitialized;
@@ -92,10 +95,21 @@ final class CICState: Persistable
 		synchronized(m_recStateCond.mutex)
 		{
 			m_recState = res;
+			rebuildWireGuidanceStatesMap();
 			m_recStateInitialized = true;
 			OnDiskState* recoveredState = loadFromFile!OnDiskState();
 			if (recoveredState)
 				loadFromMessage(*recoveredState);
+		}
+	}
+
+	private void rebuildWireGuidanceStatesMap()
+	{
+		m_wireGuidanceStates.clear();
+		foreach (ref wireGuidanceState; m_recState.wireGuidanceStates)
+		{
+			m_wireGuidanceStates[wireGuidanceState.wireGuidanceId] =
+				&wireGuidanceState;
 		}
 	}
 
@@ -130,6 +144,57 @@ final class CICState: Persistable
 	{
 		enforce(req.hydrophoneIdx >= 0 && req.hydrophoneIdx < m_recState.listenDirs.length);
 		m_recState.listenDirs[req.hydrophoneIdx] = req.dir;
+	}
+
+	void handleWireGuidanceUpdateParamsReq(CICWireGuidanceUpdateParamsReq req)
+	{
+		WireGuidanceFullState** wgsp = req.req.wireGuidanceId in m_wireGuidanceStates;
+		if (wgsp is null)
+			return;
+		WireGuidanceFullState* wgs = *wgsp;
+		foreach (newParam; req.req.weaponParams)
+		{
+			// find corresponding param in m_wireGuidanceStates
+			// and overwrite it
+			foreach (ref currentParam; wgs.weaponParams)
+			{
+				if (currentParam.type == newParam.type)
+				{
+					currentParam = newParam;
+					break;
+				}
+			}
+		}
+	}
+
+	void handleWireGuidanceStateRes(WireGuidanceStateRes res)
+	{
+		WireGuidanceFullState** wgsp = res.wireGuidanceState.wireGuidanceId in m_wireGuidanceStates;
+		if (wgsp is null)
+		{
+			// new wire-guided torp
+			m_recState.wireGuidanceStates ~= res.wireGuidanceState;
+			rebuildWireGuidanceStatesMap();
+		}
+		else
+		{
+			WireGuidanceFullState* wgs = *wgsp;
+			// regular wire-guidance update does not send
+			// weapon params.
+			auto oldParamsArray = wgs.weaponParams;
+			*wgs = res.wireGuidanceState;
+			wgs.weaponParams = oldParamsArray;
+		}
+	}
+
+	void handleWireGuidanceLostRes(WireGuidanceLostRes res)
+	{
+		WireGuidanceFullState** wgsp = res.wireGuidanceId in m_wireGuidanceStates;
+		if (wgsp is null)
+			return;
+		removeFirst!(wgfs => wgfs.wireGuidanceId == res.wireGuidanceId)(
+			m_recState.wireGuidanceStates);
+		rebuildWireGuidanceStatesMap();
 	}
 
 	void handleTubeFullState(TubeFullState res)

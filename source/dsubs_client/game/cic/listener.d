@@ -71,7 +71,8 @@ final class CICListener
 				}
 			}
 			if (cicPort == 17964)
-				throw new Exception("Unable to start CIC listener");
+				throw new Exception(
+					"Unable to start CIC listener due to port exhaustion");
 		}
 	}
 
