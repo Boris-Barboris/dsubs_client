@@ -85,6 +85,7 @@ final class ContactOverlayShapeCahe
 			sfColor(117, 79, 255, 100), 1.0);
 		m_rayChainLine = new LineShape(vec2d(0, 0), vec2d(0, 0),
 			sfColor(255, 0, 0, 150), 1.0);
+		m_wireGuidedIcon = new CircleShape(5.0f, 3, COLORS.basePlayerColor, 2);
 	}
 
 	private
@@ -105,6 +106,7 @@ final class ContactOverlayShapeCahe
 	mixin Readonly!(LineShape, "rayTracker");
 	mixin Readonly!(LineShape, "rayChainLine");
 	mixin Readonly!(LineShape, "shortestToSolution");
+	mixin Readonly!(CircleShape, "wireGuidedIcon");
 
 	// https://stackoverflow.com/a/8509802/3084875
 	static sfColor rotateColor(sfColor color, float hue)
@@ -1118,7 +1120,6 @@ final class PlayerSubIcon: OverlayElement
 		CircleShape m_shape;
 		LineShape m_velLine;
 		Submarine m_sub;
-		enum sfColor BASE_COLOR = sfColor(51, 204, 255, 230);
 		TacticalOverlay m_to;
 	}
 
@@ -1131,8 +1132,9 @@ final class PlayerSubIcon: OverlayElement
 		size = vec2i(10, 10);
 		m_shape = new CircleShape(5.0f, 12);
 		m_shape.borderWidth = 2.0f;
-		m_shape.borderColor = BASE_COLOR;
-		m_velLine = new LineShape(vec2d(5.0f, 5.0f), vec2d(6.0f, 5.0f), BASE_COLOR, 2.0f);
+		m_shape.borderColor = COLORS.basePlayerColor;
+		m_velLine = new LineShape(vec2d(5.0f, 5.0f), vec2d(6.0f, 5.0f),
+			COLORS.basePlayerColor, 2.0f);
 	}
 
 	private static sfColor getColorFromZoom(double zoom)
@@ -1140,8 +1142,8 @@ final class PlayerSubIcon: OverlayElement
 		if (zoom >= 2.0)
 			return sfTransparent;
 		else if (zoom < 0.5)
-			return BASE_COLOR;
-		sfColor res = BASE_COLOR;
+			return COLORS.basePlayerColor;
+		sfColor res = COLORS.basePlayerColor;
 		res.a = (res.a * (1.0 - (zoom - 0.5) / 1.5)).to!ubyte;
 		return res;
 	}
@@ -1160,9 +1162,7 @@ final class PlayerSubIcon: OverlayElement
 				prograde = 1e-3 * courseVector(snap.rotation);
 			double velRot = m_to.world2screenRot(courseAngle(prograde));
 			double velLen = 5.0 + snap.velocity.length;
-			// LineShape is horizontal when transform rotation is zero, so we need
-			// to add PI_2 in order to match it with dsubs rotation frame
-			m_velLine.transform.rotation = velRot + PI_2;
+			m_velLine.transform.rotation = velRot;
 			m_velLine.transform.scale = vec2d(velLen, 2.0f);
 		}
 		sfColor color = getColorFromZoom(m_to.m_camCtrl.camera.zoom);
@@ -1175,6 +1175,93 @@ final class PlayerSubIcon: OverlayElement
 		super.draw(wnd, usecsDelta);
 		m_shape.render(wnd);
 		m_velLine.render(wnd);
+	}
+}
+
+
+final class WireGuidedWeaponIcon: OverlayElementWithHover
+{
+	private
+	{
+		WireGuidedWeapon m_wpn;
+		CircleShape m_mainShape;
+		LineShape m_velLine, m_trackingLine;
+		Label m_tubeIdLabel;
+		TacticalOverlay m_to;
+	}
+
+	@property WireGuidedWeapon wireGuidedWeapon() { return m_wpn; }
+
+	this(TacticalOverlay to, WireGuidedWeapon wpn)
+	{
+		assert(wpn);
+		super(to);
+		m_to = to;
+		m_wpn = wpn;
+		// increased size for simpler hover detection
+		size = vec2i(30, 30);
+		m_onHoverRect = ctcOverlayCache.onHoverRect;
+		m_mainShape = ctcOverlayCache.wireGuidedIcon;
+		m_velLine = new LineShape(vec2d(5.0f, 5.0f), vec2d(6.0f, 5.0f),
+			COLORS.basePlayerColor, 2.0f);
+		m_trackingLine = new LineShape(vec2d(0.0f, 0.0f), vec2d(30.0f, 0.0f),
+			sfColor(168, 105, 50, 250), 2.0f);
+		m_tubeIdLabel = new Label();
+		m_tubeIdLabel.enableScissorTest = false;
+		m_tubeIdLabel.fontSize = 13;
+		m_tubeIdLabel.content = (m_wpn.tubeId + 1).to!string;
+		m_tubeIdLabel.size = cast(vec2i) vec2f(m_tubeIdLabel.contentWidth + 10,
+			m_tubeIdLabel.contentHeight + 2);
+	}
+
+	override void onPreDraw()
+	{
+		vec2d screenPos = m_to.world2screenPos(m_wpn.transform.position);
+		m_mainShape.center = cast(vec2f) screenPos;
+		m_velLine.transform.position = vec2d(screenPos.x, -screenPos.y);
+		if (m_wpn.lastState.active)
+			m_velLine.color = sfRed;
+		else
+			m_velLine.color = COLORS.basePlayerColor;
+		if (m_wpn.lastState.tracking)
+		{
+			m_trackingLine.transform.position = vec2d(screenPos.x, -screenPos.y);
+			double trackRot = m_to.world2screenRot(m_wpn.lastState.trackingDir);
+			m_trackingLine.transform.rotation = trackRot + PI_2;
+		}
+		position = center2lu(screenPos);
+		m_tubeIdLabel.position = vec2i(
+			position.x + size.x / 2 - m_tubeIdLabel.size.x / 2 + 6,
+			position.y + size.y - 10);
+		if (m_hovered)
+			m_onHoverRect.center = cast(vec2f) screenPos;
+		KinematicSnapshot snap;
+		if (m_wpn.getInterpolatedSnapshot(snap))
+		{
+			vec2d prograde = snap.velocity;
+			if (prograde == vec2d(0.0, 0.0))
+				prograde = 1e-3 * courseVector(snap.rotation);
+			double velRot = m_to.world2screenRot(courseAngle(prograde));
+			double velLen = 5.0 + snap.velocity.length;
+			// LineShape is horizontal when transform rotation is zero, so we need
+			// to add PI_2 in order to match it with dsubs rotation frame
+			m_velLine.transform.rotation = velRot + PI_2;
+			m_velLine.transform.scale = vec2d(velLen, 2.0f);
+		}
+	}
+
+	@property TacticalOverlay tacowner() { return cast(TacticalOverlay) owner; }
+
+	override void draw(Window wnd, long usecsDelta)
+	{
+		super.draw(wnd, usecsDelta);
+		if (m_hovered)
+			m_onHoverRect.render(wnd);
+		m_mainShape.render(wnd);
+		m_velLine.render(wnd);
+		if (m_wpn.lastState.tracking)
+			m_trackingLine.render(wnd);
+		m_tubeIdLabel.draw(wnd, usecsDelta);
 	}
 }
 

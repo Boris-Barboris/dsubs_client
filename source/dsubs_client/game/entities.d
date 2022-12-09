@@ -247,6 +247,9 @@ final class Tube
 		TubeType tubeType() { return m_tubeType; }
 		TubeState currentState() { return m_fullState.currentState; }
 		TubeState desiredState() { return m_fullState.desiredState; }
+		string wireGuidanceId() { return m_fullState.wireGuidanceId; }
+		bool wireGuidanceActive() { return m_fullState.wireGuidanceActive; }
+		string wireGuidedWeaponName() { return m_fullState.wireGuidedWeaponName; }
 	}
 
 	@property void marchSpeed(float rhs)
@@ -409,6 +412,106 @@ final class Tube
 }
 
 
+final class WireGuidedWeapon: WorldRenderable
+{
+	mixin Readonly!(const(WeaponTemplate*), "tmpl");
+	mixin Readonly!(string, "wireGuidanceId");
+
+	// no need to encapsulate
+	WeaponParamValue[WeaponParamType] weaponParams;
+	WireGuidanceFullState lastState;
+
+	@property int tubeId() const
+	{
+		return m_tube.id;
+	}
+
+	private
+	{
+		KinematicTrace m_trace;
+		Tube m_tube;
+		// cached limits for parameters
+		MinMax m_marchSpeedLimits;
+		MinMax m_activeSpeedLimits;
+		const(WeaponParamDescSearchPatterns)* m_searchPatternDesc;
+		const(WeaponSensorMode)[] m_availableSensorModes;
+	}
+
+	// no model atm
+	override void render(Window wnd) {}
+
+	this(EntityManager man, string wireGuidanceId, Tube tube,
+		WeaponParamValue[] weaponParamValues)
+	{
+		assert(tube.wireGuidedWeaponName, "tube.wireGuidedWeaponName is null");
+		m_tmpl = man.weaponTemplates[tube.wireGuidedWeaponName];
+		m_wireGuidanceId = wireGuidanceId;
+		m_tube = tube;
+		foreach (wp; weaponParamValues)
+		{
+			// filter-out uncontrollable-by-wire parameters
+			if (m_tmpl.wireControlledParams & wp.type)
+			{
+				weaponParams[wp.type] = wp;
+			}
+		}
+		trace("Built a wire-guided weapon object with params: ", weaponParams);
+	}
+
+	void updateKinematics(ref const KinematicSnapshot snap)
+	{
+		m_trace.appendSnapshot(snap);
+	}
+
+	/// returns true if the snapshot was written to res
+	bool getLastSnapshot(out KinematicSnapshot res) const
+	{
+		if (m_trace.canInterpolate)
+		{
+			res = m_trace.mostRecent;
+			return true;
+		}
+		return false;
+	}
+
+	/// returns true if the snapshot was written to res
+	bool getInterpolatedSnapshot(out KinematicSnapshot res) const
+	{
+		if (m_trace.canInterpolate)
+		{
+			res = m_trace.result;
+			return true;
+		}
+		return false;
+	}
+
+	@property MinMax marchSpeedLimits() const { return m_marchSpeedLimits; }
+	@property MinMax activeSpeedLimits() const { return m_activeSpeedLimits; }
+
+	@property WeaponSearchPattern[] availableSearchPatterns() const
+	{
+		return [EnumMembers!WeaponSearchPattern].filter!(
+			sp => sp & m_searchPatternDesc.availablePatterns).array;
+	}
+
+	@property const(WeaponSensorMode)[] availableSensorModes() const
+	{
+		return m_availableSensorModes;
+	}
+
+	override void update(CameraContext camCtx, long usecsDelta)
+	{
+		if (m_trace.canInterpolate)
+		{
+			m_trace.moveForward(usecsDelta);
+			// update transform from the trace
+			transform.position = m_trace.result.position;
+			transform.rotation = m_trace.result.rotation;
+		}
+	}
+}
+
+
 
 final class AttachedWire
 {
@@ -489,6 +592,16 @@ final class Submarine: WorldRenderable
 	Tube tube(int tubeId) { return m_tubes[tubeId]; }
 	auto ammoRoomRange() { return m_ammoRooms.byValue; }
 	auto tubeRange() { return m_tubes.byValue; }
+
+	Tube getTubeByWireGuidanceId(string wireGuidanceId)
+	{
+		foreach (tube; m_tubes.byValue)
+		{
+			if (tube.wireGuidanceId == wireGuidanceId)
+				return tube;
+		}
+		return null;
+	}
 
 	float targetCourse = 0.0f;
 	private float m_targetThrottle = 0.0f;

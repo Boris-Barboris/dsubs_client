@@ -30,6 +30,7 @@ import derelict.sfml2.window;
 import derelict.sfml2.graphics: sfColor;
 
 import dsubs_common.math;
+import dsubs_common.containers.array;
 
 import dsubs_client.common;
 import dsubs_client.game;
@@ -78,6 +79,7 @@ final class SimulatorState: GameState
 	private
 	{
 		float[StreamingSoundSource] m_savedSoundGains;
+		WireGuidedWeaponIcon[string] m_wireGuidedIcons;
 	}
 
 	@property void activeSonarSound(StreamingSoundSource rhs)
@@ -94,6 +96,44 @@ final class SimulatorState: GameState
 				rhs.gain = m_savedSoundGains[rhs];
 			}
 			m_activeSonarSound = rhs;
+		}
+	}
+
+	void handleWireGuidanceFullState(WireGuidanceFullState res)
+	{
+		if (res.wireGuidanceId !in m_wireGuidedIcons)
+		{
+			Tube tube = m_playerSub.getTubeByWireGuidanceId(res.wireGuidanceId);
+			enforce(tube !is null, "No tube has this wire guidance");
+			// new wire-guided weapon
+			WireGuidedWeapon wpn = new WireGuidedWeapon(Game.entityManager,
+				res.wireGuidanceId, tube, res.weaponParams);
+			wpn.lastState = res;
+			Game.worldManager.components ~= wpn;
+			// create new overlay element for it
+			WireGuidedWeaponIcon icon = new WireGuidedWeaponIcon(
+				m_tacticalOverlay, wpn);
+			m_wireGuidedIcons[res.wireGuidanceId] = icon;
+		}
+		else
+		{
+			WireGuidedWeaponIcon icon =
+				m_wireGuidedIcons[res.wireGuidanceId];
+			WireGuidedWeapon wpn = icon.wireGuidedWeapon;
+			wpn.updateKinematics(res.weaponSnap);
+			wpn.lastState = res;
+		}
+	}
+
+	void handleWireGuidanceLostRes(WireGuidanceLostRes res)
+	{
+		if (res.wireGuidanceId in m_wireGuidedIcons)
+		{
+			WireGuidedWeaponIcon icon =
+				m_wireGuidedIcons[res.wireGuidanceId];
+			WireGuidedWeapon wpn = icon.wireGuidedWeapon;
+			Game.worldManager.components.removeFirstUnstable(wpn);
+			icon.drop();
 		}
 	}
 
@@ -157,6 +197,9 @@ final class SimulatorState: GameState
 		m_contactOverlayShapeCache = new ContactOverlayShapeCahe();
 		m_contactManager = new ClientContactManager(
 			m_recState, m_playerSub.tmpl.hydrophones.length.to!int);
+
+		foreach (wgs; rawRecState.wireGuidanceStates)
+			handleWireGuidanceFullState(wgs);
 	}
 
 	override void handleBackendDisconnect()

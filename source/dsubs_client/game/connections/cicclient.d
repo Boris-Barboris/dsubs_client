@@ -392,7 +392,7 @@ private:
 	{
 		synchronized(Game.mainMutexWriter)
 		{
-			trace("CICWireGuidanceStateRes received");
+			Game.simState.handleWireGuidanceFullState(msg.res.wireGuidanceState);
 		}
 	}
 
@@ -400,7 +400,7 @@ private:
 	{
 		synchronized(Game.mainMutexWriter)
 		{
-			trace("CICWireGuidanceLostRes received");
+			Game.simState.handleWireGuidanceLostRes(msg.res);
 		}
 	}
 
