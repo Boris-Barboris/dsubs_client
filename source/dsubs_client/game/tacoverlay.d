@@ -73,6 +73,8 @@ final class ContactOverlayShapeCahe
 		m_wfRayDataOnHoverRect.position = -vec2f(1, 1);
 		m_velCircle = new CircleShape(TacticalContactElement.ZERO_SPD_PIXEL_MARGIN,
 			30, sfColor(255, 255, 255, 150), 6);
+		m_wireVelCircle = new CircleShape(50.0f,
+			30, sfColor(255, 255, 255, 50), 20.0f);
 		m_tubeCircle = new CircleShape(10, 30, COLORS.tubeCircle, 3);
 		m_velDragLine = new LineShape(vec2d(0, 0), vec2d(0, 0), sfColor(137, 182, 255, 255), 4);
 		m_pastTrailLine = new LineShape(vec2d(0, 0), vec2d(0, 0),
@@ -99,6 +101,7 @@ final class ContactOverlayShapeCahe
 	mixin Readonly!(RectangleShape, "wfRayDataMainShape");
 	mixin Readonly!(RectangleShape, "wfRayDataOnHoverRect");
 	mixin Readonly!(CircleShape, "velCircle");
+	mixin Readonly!(CircleShape, "wireVelCircle");
 	mixin Readonly!(CircleShape, "tubeCircle");
 	mixin Readonly!(LineShape, "velDragLine");
 	mixin Readonly!(LineShape, "pastTrailLine");
@@ -520,6 +523,8 @@ final class TacticalOverlay: Overlay
 
 		// pings
 		PingWaveCircleShape[int] m_sonarPings;
+
+		WireGuidedWeaponIcon m_selectedWireGuidedWeapon;
 	}
 
 	void registerPing(int sensorIdx)
@@ -630,6 +635,7 @@ final class TacticalOverlay: Overlay
 			selectedContact = null;
 			if (inMerge)
 				cancelMerge();
+			selectedWireGuidedWeapon = null;
 		}
 		if (btn == sfMouseRight)
 		{
@@ -754,7 +760,7 @@ final class TacticalOverlay: Overlay
 		// we need to start drawing all data of this contact
 		if (rhs is m_selectedContact)
 			return;
-		trace("setting owner to ", rhs);
+		trace("setting m_selectedContact to ", rhs);
 		if (m_selectedContact !is null)
 		{
 			// clear all data of this contact
@@ -770,6 +776,20 @@ final class TacticalOverlay: Overlay
 				addSelectedContactData(ctd);
 		}
 		m_selectedContact = rhs;
+	}
+
+	@property WireGuidedWeaponIcon selectedWireGuidedWeapon()
+	{
+		return m_selectedWireGuidedWeapon;
+	}
+
+	@property void selectedWireGuidedWeapon(WireGuidedWeaponIcon rhs)
+	{
+		// we need to start drawing all data of this contact
+		if (rhs is m_selectedWireGuidedWeapon)
+			return;
+		trace("setting m_selectedWireGuidedWeapon to ", rhs);
+		m_selectedWireGuidedWeapon = rhs;
 	}
 
 	/// Completely new contact data must be rendered for selectedContact
@@ -847,6 +867,8 @@ final class TacticalOverlay: Overlay
 		}
 		if (selectedContact is el)
 			selectedContact = null;
+		if (selectedWireGuidedWeapon is el)
+			selectedWireGuidedWeapon = null;
 		super.remove(el);
 	}
 
@@ -1162,7 +1184,7 @@ final class PlayerSubIcon: OverlayElement
 				prograde = 1e-3 * courseVector(snap.rotation);
 			double velRot = m_to.world2screenRot(courseAngle(prograde));
 			double velLen = 5.0 + snap.velocity.length;
-			m_velLine.transform.rotation = velRot;
+			m_velLine.transform.rotation = velRot + PI_2;
 			m_velLine.transform.scale = vec2d(velLen, 2.0f);
 		}
 		sfColor color = getColorFromZoom(m_to.m_camCtrl.camera.zoom);
@@ -1184,13 +1206,20 @@ final class WireGuidedWeaponIcon: OverlayElementWithHover
 	private
 	{
 		WireGuidedWeapon m_wpn;
-		CircleShape m_mainShape;
-		LineShape m_velLine, m_trackingLine;
+		CircleShape m_mainShape, m_velCircle;
+		LineShape m_velLine, m_trackingLine, m_velDragLine;
 		Label m_tubeIdLabel;
 		TacticalOverlay m_to;
+		vec2d m_lastScreenPos;
+		vec2d m_desiredCourseVector;
 	}
 
 	@property WireGuidedWeapon wireGuidedWeapon() { return m_wpn; }
+
+	@property bool isSelected()
+	{
+		return tacowner.selectedWireGuidedWeapon is this;
+	}
 
 	this(TacticalOverlay to, WireGuidedWeapon wpn)
 	{
@@ -1202,16 +1231,95 @@ final class WireGuidedWeaponIcon: OverlayElementWithHover
 		size = vec2i(30, 30);
 		m_onHoverRect = ctcOverlayCache.onHoverRect;
 		m_mainShape = ctcOverlayCache.wireGuidedIcon;
+		m_velCircle = ctcOverlayCache.wireVelCircle;
 		m_velLine = new LineShape(vec2d(5.0f, 5.0f), vec2d(6.0f, 5.0f),
 			COLORS.basePlayerColor, 2.0f);
 		m_trackingLine = new LineShape(vec2d(0.0f, 0.0f), vec2d(30.0f, 0.0f),
 			sfColor(168, 105, 50, 250), 2.0f);
+		m_velDragLine = ctcOverlayCache.velDragLine;
 		m_tubeIdLabel = new Label();
 		m_tubeIdLabel.enableScissorTest = false;
 		m_tubeIdLabel.fontSize = 13;
 		m_tubeIdLabel.content = (m_wpn.tubeId + 1).to!string;
 		m_tubeIdLabel.size = cast(vec2i) vec2f(m_tubeIdLabel.contentWidth + 10,
 			m_tubeIdLabel.contentHeight + 2);
+		// events
+		onMouseUp += &processMouseUp;
+		onMouseMove += &processMouseMove;
+		onMouseDown += &processMouseDown;
+	}
+
+	/// Overlay elements must ignore mouse scroll in order to not block zooming
+	override GuiElement getFromPoint(const sfEvent* evt, int x, int y)
+	{
+		if (evt.type == sfEvtMouseWheelScrolled)
+			return null;
+		// velCircle check
+		if (isSelected)
+		{
+			// check if cursor is inside the circle
+			if (pointOnCircle(vec2i(x, y)))
+				return this;
+		}
+		return GuiElement.getFromPoint(evt, x, y);
+	}
+
+	private bool pointOnCircle(vec2i point)
+	{
+		double rad = (m_lastScreenPos - point).length;
+		return (rad >= (m_velCircle.radius - 3) &&
+				rad <= (m_velCircle.radius + m_velCircle.borderWidth + 3));
+	}
+
+	private void processMouseUp(int x, int y, sfMouseButton btn)
+	{
+		if (btn == sfMouseLeft)
+		{
+			if (m_dragging)
+			{
+				m_dragging = false;
+				if (!m_panning)
+					returnMouseFocus();
+				// send updated desired course value
+				if (m_desiredCourseVector != vec2d.init)
+				{
+					WeaponParamValue courseValue = WeaponParamValue(
+						WeaponParamType.course);
+					courseValue.course = courseAngle(m_desiredCourseVector);
+					m_wpn.sendDesiredParamValue(courseValue);
+				}
+			}
+			else
+			{
+				tacowner.selectedWireGuidedWeapon = this;
+			}
+		}
+	}
+
+	private void processMouseDown(int x, int y, sfMouseButton btn)
+	{
+		if (btn == sfMouseLeft && isSelected)
+		{
+			if (pointOnCircle(vec2i(x, y)))
+			{
+				m_dragging = true;
+				requestMouseFocus();
+			}
+		}
+	}
+
+	private void processMouseMove(int x, int y)
+	{
+		if (m_dragging)
+		{
+			// velocity dragging
+			vec2d center = m_lastScreenPos;
+			vec2d delta = vec2d(x, y) - center;
+			delta.y = -delta.y;	// screen-space y
+			double lineLen = delta.length;
+			if (lineLen > 1)
+				m_desiredCourseVector = delta.normalized;
+		}
 	}
 
 	override void onPreDraw()
@@ -1248,6 +1356,20 @@ final class WireGuidedWeaponIcon: OverlayElementWithHover
 			m_velLine.transform.rotation = velRot + PI_2;
 			m_velLine.transform.scale = vec2d(velLen, 2.0f);
 		}
+		if (isSelected)
+		{
+			m_velCircle.center = cast(vec2f) screenPos;
+			if (!m_dragging)
+			{
+				m_desiredCourseVector =
+					m_wpn.weaponParams[WeaponParamType.course].course.courseVector;
+			}
+			vec2d velPoint2 = m_velCircle.radius * m_desiredCourseVector;
+			velPoint2.y = -velPoint2.y;
+			velPoint2 += screenPos;
+			m_velDragLine.setPoints(screenPos, velPoint2, true);
+		}
+		m_lastScreenPos = screenPos;
 	}
 
 	@property TacticalOverlay tacowner() { return cast(TacticalOverlay) owner; }
@@ -1258,6 +1380,18 @@ final class WireGuidedWeaponIcon: OverlayElementWithHover
 		if (m_hovered)
 			m_onHoverRect.render(wnd);
 		m_mainShape.render(wnd);
+		if (isSelected)
+		{
+			if (!m_dragging)
+			{
+				if (m_hovered)
+					m_velCircle.borderColor = sfColor(255, 0, 0, 50);
+				else
+					m_velCircle.borderColor = sfColor(255, 255, 255, 50);
+				m_velCircle.render(wnd);
+			}
+			m_velDragLine.render(wnd);
+		}
 		m_velLine.render(wnd);
 		if (m_wpn.lastState.tracking)
 			m_trackingLine.render(wnd);
@@ -2351,7 +2485,7 @@ final class WeaponProjectionTrace: OverlayElement
 		WeaponSearchPattern pattern = m_tube.weaponParams[WeaponParamType.searchPattern].
 			searchPattern;
 		// snake-related
-		float snakeAngle = dgr2rad(45.0f);
+		float snakeAngle = dgr2rad(m_tube.searchPatternDesc.snakeAngle);
 		float snakeArm = m_tube.searchPatternDesc.snakeWidth / cos(snakeAngle);
 		float snakeSign = 1.0f;
 		// spiral-related

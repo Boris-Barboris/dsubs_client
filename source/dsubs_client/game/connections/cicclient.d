@@ -382,7 +382,6 @@ private:
 	{
 		synchronized(Game.mainMutexWriter)
 		{
-			// trace("CICTubeStateUpdateRes received: ", msg.res);
 			Game.simState.playerSub.tube(msg.res.tube.tubeId).
 				updateFromFullState(msg.res.tube);
 		}
@@ -408,7 +407,7 @@ private:
 	{
 		synchronized(Game.mainMutexWriter)
 		{
-			trace("CICWireGuidanceUpdateParamsReq received");
+			Game.simState.handleWireGuidanceUpdateParamsReq(msg.req);
 		}
 	}
 

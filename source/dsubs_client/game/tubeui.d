@@ -52,15 +52,29 @@ private
 
 final class TubeUI
 {
+	enum TubeUIAimState
+	{
+		notAiming,
+		aiming,
+		wireGuiding
+	}
+
 	private
 	{
 		Tube m_tube;
 		Div m_mainDiv;
 
-		// aim seciton
+		// div that contains aiming weapon parameters
 		Div m_aimDiv;
+		// div that contains wire-guidance weapon parameters
+		Div m_wireGuideDiv;
+		// set of delegates that are run when certain gui element
+		// must be update from the wire-guided weapon state
+		void delegate()[WeaponParamType] m_wireParamUpdaters;
+		// filler that takes it's place when the tube is neither
+		// loaded nor wire-guiding
 		GuiElement m_aimFiller;
-		bool m_aiming;
+		TubeUIAimState m_state;
 		WeaponProjectionTrace m_overlayTrace;
 		WeaponAimHandle m_overlayHandle;
 
@@ -75,6 +89,8 @@ final class TubeUI
 
 		// weapon type that is consistent with aim controls and trails
 		string m_aimingSectionWeapon;
+		string m_wireGuidedWeapon;
+		string m_wireGuidanceId;
 	}
 
 	@property Div mainDiv() { return m_mainDiv; }
@@ -172,20 +188,48 @@ final class TubeUI
 			Game.simState.tacticalOverlay, m_tube, this);
 	}
 
+	void recreateWireGuidance(WireGuidedWeapon wgw)
+	{
+		m_wireGuidedWeapon = wgw.tube.wireGuidedWeaponName;
+		assert(m_wireGuidedWeapon);
+		m_wireGuidanceId = wgw.wireGuidanceId;
+		buildWireGuidanceDiv(wgw);
+		m_mainDiv.setChild(m_wireGuideDiv, 0);
+		m_state = TubeUIAimState.wireGuiding;
+	}
+
+	void cutWireGuidance()
+	{
+		if (m_state == TubeUIAimState.wireGuiding)
+		{
+			m_mainDiv.setChild(m_aimFiller, 0);
+			m_wireParamUpdaters.clear();
+			m_state = TubeUIAimState.notAiming;
+		}
+	}
+
+	// called when CIC re-broadcasts WireGuidanceUpdateParamsReq
+	void updateWireGuidanceParamFromWeapon(WeaponParamType type)
+	{
+		if (type in m_wireParamUpdaters)
+			m_wireParamUpdaters[type]();
+	}
+
 	private void onAimButtonClick()
 	{
-		if (!m_aiming && m_tube.loadedWeapon)
+		if (m_state == TubeUIAimState.notAiming && m_tube.loadedWeapon)
 		{
-			m_aimButton.content = "Stop aiming";
 			recreateAim();
+			m_aimButton.content = "Stop aiming";
+			m_state = TubeUIAimState.aiming;
 		}
 		else
 		{
 			m_aimButton.content = "Aim";
 			m_mainDiv.setChild(m_aimFiller, 0);
 			dropTraceAndHandle();
+			m_state = TubeUIAimState.notAiming;
 		}
-		m_aiming = !m_aiming;
 	}
 
 	private
@@ -453,6 +497,253 @@ final class TubeUI
 		updateAimFieldsFromTube();
 	}
 
+	private void buildWireGuidanceDiv(WireGuidedWeapon wgw)
+	{
+		// build m_aimDiv
+		Label courseLabel = builder(new Label()).content("course ").
+			fontSize(FONT).fixedSize(vec2i(45, 1)).build;
+
+		m_courseTextField = builder(new TextField()).
+			symbolFilter(&numericSymbFilter).fontSize(FONT).build;
+		m_wireParamUpdaters[WeaponParamType.course] = () {
+			string courseFieldContent = format("%.1f",
+				-wgw.weaponParams[WeaponParamType.course].course.compassAngle.rad2dgr);
+			m_courseTextField.content = courseFieldContent;
+		};
+		m_wireParamUpdaters[WeaponParamType.course]();
+		m_courseTextField.onKbFocusLoss += () {
+			if (m_courseTextField.content.length > 1)
+			{
+				try
+				{
+					float newTgt = m_courseTextField.content[0..$-1].to!float;
+					if (!isNaN(newTgt))
+					{
+						float radTgt = -newTgt.dgr2rad;
+						WeaponParamValue courseParam = WeaponParamValue(
+							WeaponParamType.course);
+						courseParam.course = radTgt;
+						wgw.sendDesiredParamValue(courseParam);
+					}
+				}
+				catch (Exception e) {}
+			}
+		};
+
+		// activation range is never controlled by wire
+		m_activationRangeField = null;
+
+		Label marchSpeedLabel;
+		TextField marchSpeedField;
+		if (WeaponParamType.marchSpeed in wgw.weaponParams)
+		{
+			marchSpeedLabel = builder(new Label()).content("RTE spd ").
+				fontSize(FONT).fixedSize(vec2i(50, 1)).build;
+			marchSpeedField = builder(new TextField()).
+				symbolFilter(&numericSymbFilter).fontSize(FONT).build;
+			m_wireParamUpdaters[WeaponParamType.marchSpeed] = () {
+				string marchSpeedContent = format("%.1f",
+					wgw.weaponParams[WeaponParamType.marchSpeed].speed);
+				marchSpeedField.content = marchSpeedContent;
+			};
+			m_wireParamUpdaters[WeaponParamType.marchSpeed]();
+			marchSpeedField.onKbFocusLoss += () {
+				try
+				{
+					float rawTgt = marchSpeedField.content[0..$-1].to!float;
+					if (!isNaN(rawTgt))
+					{
+						float clampedTgt = max(wgw.marchSpeedLimits.min, rawTgt);
+						clampedTgt = min(wgw.marchSpeedLimits.max, clampedTgt);
+						marchSpeedField.content = format("%.1f", clampedTgt);
+						WeaponParamValue spdParam = WeaponParamValue(
+							WeaponParamType.marchSpeed);
+						spdParam.speed = clampedTgt;
+						wgw.sendDesiredParamValue(spdParam);
+					}
+				}
+				catch (Exception e)
+				{
+					marchSpeedField.content = format("%.1f",
+						wgw.weaponParams[WeaponParamType.marchSpeed].speed);
+				}
+			};
+		}
+
+		Label activeSpeedLabel;
+		TextField activeSpeedField;
+		if (WeaponParamType.activeSpeed in wgw.weaponParams)
+		{
+			activeSpeedLabel = builder(new Label()).content("ACT spd ").
+				fontSize(FONT).fixedSize(vec2i(50, 1)).build;
+			activeSpeedField = builder(new TextField()).
+				symbolFilter(&numericSymbFilter).fontSize(FONT).build;
+			m_wireParamUpdaters[WeaponParamType.activeSpeed] = () {
+				string activeSpeedContent = format("%.1f",
+					wgw.weaponParams[WeaponParamType.activeSpeed].speed);
+				activeSpeedField.content = activeSpeedContent;
+			};
+			m_wireParamUpdaters[WeaponParamType.activeSpeed]();
+			activeSpeedField.onKbFocusLoss += () {
+				try
+				{
+					float rawTgt = activeSpeedField.content[0..$-1].to!float;
+					if (!isNaN(rawTgt))
+					{
+						float clampedTgt = max(wgw.activeSpeedLimits.min, rawTgt);
+						clampedTgt = min(wgw.activeSpeedLimits.max, clampedTgt);
+						activeSpeedField.content = format("%.1f", clampedTgt);
+						WeaponParamValue spdParam = WeaponParamValue(
+							WeaponParamType.activeSpeed);
+						spdParam.speed = clampedTgt;
+						wgw.sendDesiredParamValue(spdParam);
+					}
+				}
+				catch (Exception e)
+				{
+					activeSpeedField.content = format("%.1f",
+						wgw.weaponParams[WeaponParamType.activeSpeed].speed);
+				}
+			};
+		}
+
+		Label patternLabel;
+		Button patternButton;
+		if (WeaponParamType.searchPattern in wgw.weaponParams)
+		{
+			patternLabel = builder(new Label()).content("ptrn ").
+				fontSize(FONT).fixedSize(vec2i(30, 1)).build;
+			patternButton = builder(new Button()).
+				fontSize(FONT).backgroundColor(COLORS.simButtonBgnd).build;
+			m_wireParamUpdaters[WeaponParamType.searchPattern] = () {
+				string ptrnContent =
+					wgw.weaponParams[WeaponParamType.searchPattern].
+						searchPattern.to!string;
+				patternButton.content = ptrnContent;
+			};
+			m_wireParamUpdaters[WeaponParamType.searchPattern]();
+			patternButton.onClick += () {
+				Button[] spButtons;
+				foreach (WeaponSearchPattern pattern; wgw.availableSearchPatterns)
+				{
+					Button btn = builder(new Button()).content(pattern.to!string).
+						fontSize(FONT).build;
+					btn.onClick += (WeaponSearchPattern p) {
+						return {
+							WeaponParamValue ptrnParam = WeaponParamValue(
+								WeaponParamType.searchPattern);
+							ptrnParam.searchPattern = p;
+							wgw.sendDesiredParamValue(ptrnParam);
+							patternButton.content = p.to!string;
+						};
+					} (pattern);
+					spButtons ~= btn;
+				}
+				contextMenu(Game.guiManager, spButtons, Game.window.size,
+					Game.window.mousePos, FONT + 4);
+			};
+		}
+
+		Label sensorLabel;
+		Button sensorButton;
+		if (WeaponParamType.sensorMode in wgw.weaponParams)
+		{
+			sensorLabel = builder(new Label()).content("sens ").
+				fontSize(FONT).fixedSize(vec2i(30, 1)).build;
+			sensorButton = builder(new Button()).
+				fontSize(FONT).backgroundColor(COLORS.simButtonBgnd).build;
+			m_wireParamUpdaters[WeaponParamType.sensorMode] = () {
+				string sensorContent =
+					wgw.weaponParams[WeaponParamType.sensorMode].
+						sensorMode.to!string;
+				sensorButton.content = sensorContent;
+			};
+			m_wireParamUpdaters[WeaponParamType.sensorMode]();
+			sensorButton.onClick += () {
+				Button[] smButtons;
+				foreach (WeaponSensorMode sensMode; wgw.availableSensorModes)
+				{
+					Button btn = builder(new Button()).content(sensMode.to!string).
+						fontSize(FONT).build;
+					btn.onClick += (WeaponSensorMode sm) {
+						return {
+							WeaponParamValue sensorParam = WeaponParamValue(
+								WeaponParamType.sensorMode);
+							sensorParam.sensorMode = sm;
+							wgw.sendDesiredParamValue(sensorParam);
+							sensorButton.content = sm.to!string;
+						};
+					} (sensMode);
+					smButtons ~= btn;
+				}
+				contextMenu(Game.guiManager, smButtons, Game.window.size,
+					Game.window.mousePos, FONT + 4);
+			};
+		}
+
+		Button activateBtn, deactivateBtn;
+		{
+			activateBtn = builder(new Button()).content("Activ").
+				fontSize(FONT).backgroundColor(COLORS.simButtonBgnd).build;
+			activateBtn.onClick += () {
+				wgw.sendShouldBeActive(true);
+			};
+			deactivateBtn = builder(new Button()).content("Deact").
+				fontSize(FONT).backgroundColor(COLORS.simButtonBgnd).build;
+			deactivateBtn.onClick += () {
+				wgw.sendShouldBeActive(false);
+			};
+		}
+
+		m_wireGuideDiv = builder(vDiv([
+				filler(),
+				builder(hDiv([activateBtn, deactivateBtn])).
+					fixedSize(vec2i(1, FONT + 4)).build,
+				builder(hDiv([courseLabel, m_courseTextField])).
+					fixedSize(vec2i(1, FONT + 4)).build,
+				marchSpeedLabel ?
+					builder(hDiv([marchSpeedLabel, marchSpeedField])).
+						fixedSize(vec2i(1, FONT + 4)).build : null,
+				activeSpeedLabel ?
+					builder(hDiv([activeSpeedLabel, activeSpeedField])).
+						fixedSize(vec2i(1, FONT + 4)).build : null,
+				patternLabel ?
+					builder(hDiv([patternLabel, patternButton])).
+						fixedSize(vec2i(1, FONT + 4)).build : null,
+				sensorLabel ?
+					builder(hDiv([sensorLabel, sensorButton])).
+						fixedSize(vec2i(1, FONT + 4)).build : null
+			].filter!(e => e !is null).array)).borderWidth(4).
+				fixedSize(vec2i(80, AIM_BLOCK_HEIGHT)).build;
+
+		// bind up and down keys in cycle
+		TextField[] allTextFields;
+		for (size_t i = 2; i < m_wireGuideDiv.children.length; i++)
+		{
+			TextField curField = cast(TextField)(
+				(cast(Div) m_wireGuideDiv.children[i]).children[1]);
+			if (curField !is null)
+				allTextFields ~= curField;
+		}
+		for (size_t i = 0; i < allTextFields.length; i++)
+		{
+			TextField curField = allTextFields[i];
+			TextField nextField = allTextFields[(i + 1) % $];
+			curField.onKeyPressed += (nf) {
+				return (const sfKeyEvent* evt) {
+					if (evt.code == sfKeyDown)
+						nf.requestKbFocus();
+					};
+				} (nextField);
+			nextField.onKeyPressed += (cf) {
+				return (const sfKeyEvent* evt) {
+					if (evt.code == sfKeyUp)
+						cf.requestKbFocus();
+					};
+				} (curField);
+		}
+	}
+
 	private static bool numericSymbFilter(dchar c)
 	{
 		if (c >= '0' && c <= '9' || c == '.' || c == '-')
@@ -517,15 +808,18 @@ final class TubeUI
 		{
 			if (m_aimButton)
 				m_aimButton.pressable = false;
-			if (m_aiming)
+			if (m_state == TubeUIAimState.aiming)
+			{
 				onAimButtonClick();
-			assert(!m_aiming);
+				assert(m_state == TubeUIAimState.notAiming);
+			}
 		}
 		else
 		{
 			if (m_aimButton)
 				m_aimButton.pressable = true;
-			if (m_aiming && m_aimingSectionWeapon != m_tube.loadedWeapon)
+			if (m_state == TubeUIAimState.aiming &&
+				m_aimingSectionWeapon != m_tube.loadedWeapon)
 			{
 				// weapon was changed without toggling aim button, we need
 				// to recreate aim section

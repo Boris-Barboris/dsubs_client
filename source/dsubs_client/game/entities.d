@@ -417,13 +417,31 @@ final class WireGuidedWeapon: WorldRenderable
 	mixin Readonly!(const(WeaponTemplate*), "tmpl");
 	mixin Readonly!(string, "wireGuidanceId");
 
-	// no need to encapsulate
+	// no need to encapsulate. Only controllable params are here.
 	WeaponParamValue[WeaponParamType] weaponParams;
 	WireGuidanceFullState lastState;
 
 	@property int tubeId() const
 	{
 		return m_tube.id;
+	}
+
+	@property Tube tube()
+	{
+		return m_tube;
+	}
+
+	void sendDesiredParamValue(WeaponParamValue param)
+	{
+		assert(param.type in weaponParams);
+		Game.ciccon.sendMessage(cast(immutable) CICWireGuidanceUpdateParamsReq(
+			WireGuidanceUpdateParamsReq(wireGuidanceId, [param])));
+	}
+
+	void sendShouldBeActive(bool shouldBeActive)
+	{
+		Game.ciccon.sendMessage(cast(immutable) CICWireGuidanceActivateReq(
+			WireGuidanceActivateReq(wireGuidanceId, shouldBeActive)));
 	}
 
 	private
@@ -456,6 +474,28 @@ final class WireGuidedWeapon: WorldRenderable
 			}
 		}
 		trace("Built a wire-guided weapon object with params: ", weaponParams);
+		// initialize limits from template
+		foreach (ref const WeaponParamDesc desc; m_tmpl.paramDescs)
+		{
+			switch (desc.type)
+			{
+				case WeaponParamType.marchSpeed:
+					m_marchSpeedLimits = desc.speedRange;
+					break;
+				case WeaponParamType.activeSpeed:
+					m_activeSpeedLimits = desc.speedRange;
+					break;
+				case WeaponParamType.sensorMode:
+					m_availableSensorModes = [EnumMembers!WeaponSensorMode].
+						filter!(sm => sm & desc.sensorModes).array;
+					break;
+				case WeaponParamType.searchPattern:
+					m_searchPatternDesc = &desc.searchPatterns;
+					break;
+				default:
+					break;
+			}
+		}
 	}
 
 	void updateKinematics(ref const KinematicSnapshot snap)

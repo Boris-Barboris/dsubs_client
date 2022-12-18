@@ -114,6 +114,8 @@ final class SimulatorState: GameState
 			WireGuidedWeaponIcon icon = new WireGuidedWeaponIcon(
 				m_tacticalOverlay, wpn);
 			m_wireGuidedIcons[res.wireGuidanceId] = icon;
+			// find tube ui and create wire-guidance params for it
+			gui.tubeUis[tube.id].recreateWireGuidance(wpn);
 		}
 		else
 		{
@@ -122,6 +124,23 @@ final class SimulatorState: GameState
 			WireGuidedWeapon wpn = icon.wireGuidedWeapon;
 			wpn.updateKinematics(res.weaponSnap);
 			wpn.lastState = res;
+		}
+	}
+
+	void handleWireGuidanceUpdateParamsReq(WireGuidanceUpdateParamsReq req)
+	{
+		if (req.wireGuidanceId !in m_wireGuidedIcons)
+			return;
+		WireGuidedWeaponIcon icon = m_wireGuidedIcons[req.wireGuidanceId];
+		WireGuidedWeapon wpn = icon.wireGuidedWeapon;
+		TubeUI tubeUi = gui.tubeUis[wpn.tubeId];
+		foreach (WeaponParamValue param; req.weaponParams)
+		{
+			if (param.type in wpn.weaponParams)
+			{
+				wpn.weaponParams[param.type] = param;
+				tubeUi.updateWireGuidanceParamFromWeapon(param.type);
+			}
 		}
 	}
 
@@ -134,6 +153,7 @@ final class SimulatorState: GameState
 			WireGuidedWeapon wpn = icon.wireGuidedWeapon;
 			Game.worldManager.components.removeFirstUnstable(wpn);
 			icon.drop();
+			gui.tubeUis[wpn.tubeId].cutWireGuidance();
 		}
 	}
 
