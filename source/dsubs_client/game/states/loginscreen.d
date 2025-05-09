@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -299,6 +299,8 @@ final class LoginScreenState: GameState
 		Game.entityDbHash = res.dbHash;
 		infoLabel.content = "Requesting entity database";
 		Game.bconm.con.sendMessage(immutable EntityDbReq());
+		// connect secondary audio socket
+		Game.bconm.startSecondary(res.secondaryConnectionSecret);
 		// check if we are already swimming out there on the server
 		if (res.alreadySpawned)
 		{

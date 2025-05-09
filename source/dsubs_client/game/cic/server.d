@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -46,7 +46,7 @@ final class CICServer
 	{
 		CICListener m_listener;
 		CICState m_state;
-		BackendConnection m_bcon;
+		BackendMainConnection m_bcon;
 		WaterfallAnalyzer[] m_wfAnalizers;
 		RayGeneratorSynchronizer* m_raySyncer;
 		bool m_dead;
@@ -54,9 +54,9 @@ final class CICServer
 		Thread m_fuzzerThread;
 	}
 
-	@property BackendConnection bcon() { return m_bcon; }
+	@property BackendMainConnection bcon() { return m_bcon; }
 
-	this(string password, BackendConnection bcon)
+	this(string password, BackendMainConnection bcon)
 	{
 		m_listener = new CICListener(this, password);
 		m_state = new CICState();
@@ -206,9 +206,9 @@ final class CICServer
 		m_listener.broadcast(immutable CICSimFlowEndRes(res));
 	}
 
-	void handleAcousticStreamRes(AcousticStreamRes res)
+	void handleHydrophoneDataStreamRes(HydrophoneDataStreamRes res)
 	{
-		CICSubAcousticRes bdcst = cast(CICSubAcousticRes) res;
+		CICHydrophoneDataStreamRes bdcst = cast(CICHydrophoneDataStreamRes) res;
 		enforce(m_state.recStateInitialized);
 		enforce(res.atTime == m_state.recState.subSnap.atTime);
 		m_listener.broadcast(cast(immutable) bdcst);
@@ -233,6 +233,14 @@ final class CICServer
 			// dump all contact data.
 			m_state.saveToDiskIfPossible();
 		}
+	}
+
+	void handleHydrophoneAudioStreamRes(HydrophoneAudioStreamRes res)
+	{
+		CICHydrophoneAudioStreamRes bdcst = cast(CICHydrophoneAudioStreamRes) res;
+		if (!m_state.recStateInitialized)	// racy first message, skip it
+			return;
+		m_listener.broadcast(cast(immutable) bdcst);
 	}
 
 	void handleSonarStreamRes(SonarStreamRes res)

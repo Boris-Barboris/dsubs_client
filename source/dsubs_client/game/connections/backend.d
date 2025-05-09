@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -41,7 +41,7 @@ import dsubs_client.game.entities;
 
 
 /// TCP connection to backend dsubs server
-final class BackendConnection: ProtocolConnection!BackendProtocol
+final class BackendMainConnection: ProtocolConnection!BackendProtocol
 {
 	this(Socket sock)
 	{
@@ -138,7 +138,7 @@ private:
 	}
 
 	mixin(passToCICMixin!(SubKinematicRes));
-	mixin(passToCICMixin!(AcousticStreamRes));
+	mixin(passToCICMixin!(HydrophoneDataStreamRes));
 	mixin(passToCICMixin!(SonarStreamRes));
 	mixin(passToCICMixin!(SimFlowEndRes));
 	mixin(passToCICMixin!(TubeStateUpdateRes));
@@ -164,15 +164,45 @@ private:
 }
 
 
-/// Worker thread that maintains connection to the backend open.
+/// Secondary TCP connection to backend dsubs server, used to receive
+/// bulky audio data.
+final class BackendSecondaryConnection: ProtocolConnection!BackendProtocol
+{
+	this(Socket sock)
+	{
+		super(sock);
+		mixinHandlers(this);
+	}
+
+private:
+
+	// pass server response to handler of a CIC server.
+	static string passToCICMixin(MsgT)()
+	{
+		string conMethodName = "h_" ~ MsgT.stringof;
+		string res = "void " ~ conMethodName ~ "(" ~ MsgT.stringof ~ " res)";
+		res ~= `{
+			Game.cic.handle` ~ MsgT.stringof ~ `(res);
+		}`;
+		return res;
+	}
+
+	mixin(passToCICMixin!(HydrophoneAudioStreamRes));
+}
+
+
+/// Worker thread that maintains connections to the backend open.
 final class BackendConMaintainer
 {
-	private Thread m_thread;
+	private Thread m_mainThread, m_secondaryThread;
 	private shared bool exit_flag;
 	private bool m_started;
-	private BackendConnection m_con;
+	private BackendMainConnection m_con;
+	private BackendSecondaryConnection m_secCon;
+	private string m_secondaryConnectionSecret;
 
-	@property BackendConnection con() { return m_con; }
+	@property BackendMainConnection con() { return m_con; }
+	@property BackendSecondaryConnection secondaryCon() { return m_secCon; }
 
 	void start()
 	{
@@ -180,9 +210,20 @@ final class BackendConMaintainer
 		trace("starting BackendConMaintainer");
 		assert(m_con is null);
 		exit_flag = false;
-		m_thread = new Thread(&proc);
-		m_thread.start();
+		m_mainThread = new Thread(&mainProc);
+		m_mainThread.start();
 		m_started = true;
+	}
+
+	void startSecondary(string secondaryConnectionSecret)
+	{
+		assert(m_started);
+		assert(secondaryConnectionSecret);
+		m_secondaryConnectionSecret = secondaryConnectionSecret;
+		trace("starting secondary connection to backend");
+		assert(m_secCon is null);
+		m_secondaryThread = new Thread(&secondaryProc);
+		m_secondaryThread.start();
 	}
 
 	void stop()
@@ -190,12 +231,36 @@ final class BackendConMaintainer
 		trace("stopping BackendConMaintainer");
 		atomicStore(exit_flag, true);
 		if (m_started && m_con)
+		{
 			m_con.close();
+			if (m_secCon)
+				m_secCon.close();
+		}
 	}
 
 	@property bool stopped() const { return exit_flag; }
 
-	private void proc()
+	private AddressInfo[] getAddrs()
+	{
+		AddressInfo[] addrs;
+		version (prod)
+		{
+			addrs = getAddressInfo(
+				environment.get("DSUBS_BACKEND_HOST", "borisbarboris.duckdns.org"),
+				environment.get("DSUBS_BACKEND_PORT", "17955"));
+		}
+		else
+		{
+			addrs = getAddressInfo(
+				environment.get("DSUBS_BACKEND_HOST", "127.0.0.1"),
+				environment.get("DSUBS_BACKEND_PORT", "17855"));
+		}
+		if (addrs.length < 1)
+			throw new Exception("no backend address could be resolved");
+		return addrs;
+	}
+
+	private void mainProc()
 	{
 		scope(exit) m_con = null;
 		while (!atomicLoad(exit_flag))
@@ -204,27 +269,40 @@ final class BackendConMaintainer
 			{
 				Socket clientSock = new Socket(AddressFamily.INET,
 					SocketType.STREAM, ProtocolType.IP);
-				AddressInfo[] addrs;
-				version (prod)
-				{
-					addrs = getAddressInfo(
-						environment.get("DSUBS_BACKEND_HOST", "borisbarboris.duckdns.org"),
-						environment.get("DSUBS_BACKEND_PORT", "17955"));
-				}
-				else
-				{
-					addrs = getAddressInfo(
-						environment.get("DSUBS_BACKEND_HOST", "127.0.0.1"),
-						environment.get("DSUBS_BACKEND_PORT", "17855"));
-				}
-				if (addrs.length < 1)
-					throw new Exception("no backend address could be resolved");
+				AddressInfo[] addrs = getAddrs();
 				info("Attempting to connect to backend ", addrs[0]);
 				clientSock.connect(addrs[0].address);
-				m_con = new BackendConnection(clientSock);
+				m_con = new BackendMainConnection(clientSock);
 				m_con.start();
 				m_con.sendMessage(immutable ServerStatusReq());
 				m_con.join();
+			}
+			catch (Exception ex)
+			{
+				error(ex.msg);
+			}
+			// flood protection
+			Thread.sleep(seconds(10));
+		}
+	}
+
+	private void secondaryProc()
+	{
+		scope(exit) m_secCon = null;
+		while (!atomicLoad(exit_flag))
+		{
+			try
+			{
+				Socket clientSock = new Socket(AddressFamily.INET,
+					SocketType.STREAM, ProtocolType.IP);
+				AddressInfo[] addrs = getAddrs();
+				info("Attempting to connect to backend ", addrs[0]);
+				clientSock.connect(addrs[0].address);
+				m_secCon = new BackendSecondaryConnection(clientSock);
+				m_secCon.start();
+				m_secCon.sendMessage(immutable LoginSecondaryReq(
+					m_secondaryConnectionSecret));
+				m_secCon.join();
 			}
 			catch (Exception ex)
 			{

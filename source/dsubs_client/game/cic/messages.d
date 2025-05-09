@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -39,7 +39,7 @@ struct CICLoginRes
 {
 	__gshared const int g_marshIdx;
 	@MaxLenAttr(32) immutable(ubyte)[] dbHash;	/// entity database hash (SHA256)
-	int apiVersion = 12;
+	int apiVersion = 13;
 }
 
 /// CIC client sends this to receive entity DB
@@ -82,11 +82,17 @@ struct CICSubKinematicRes
 	WireSnapshot[] wireSnaps;
 }
 
-struct CICSubAcousticRes
+struct CICHydrophoneDataStreamRes
 {
 	__gshared const int g_marshIdx;
 	usecs_t atTime;
 	HydrophoneData[] data;
+}
+
+struct CICHydrophoneAudioStreamRes
+{
+	__gshared const int g_marshIdx;
+	usecs_t atTime;
 	HydrophoneAudio[] audio;
 }
 

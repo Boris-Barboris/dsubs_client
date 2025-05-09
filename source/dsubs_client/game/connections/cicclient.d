@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -208,7 +208,7 @@ private:
 		}
 	}
 
-	void h_acousticRes(CICSubAcousticRes res)
+	void h_hydrophoneDataStreamResRes(CICHydrophoneDataStreamRes res)
 	{
 		synchronized(Game.mainMutexWriter)
 		{
@@ -229,6 +229,13 @@ private:
 			foreach (waterfall; Game.simState.gui.waterfalls)
 				if (waterfall.hydrophoneIdx !in arrivedDataIdx)
 					waterfall.completeRow(null);
+		}
+	}
+
+	void h_hydrophoneAudioStreamRes(CICHydrophoneAudioStreamRes res)
+	{
+		synchronized(Game.mainMutexWriter)
+		{
 			// time-domain sound
 			foreach (HydrophoneAudio audio; res.audio)
 			{
@@ -237,7 +244,8 @@ private:
 					s.setNextSample(audio.samples, audio.samplingRate);
 				else
 				{
-					// we delay first sample enqueing in order to reduce the risk of stutter
+					// we delay first sample enqueing in order to reduce the risk
+					// of a stutter
 					Game.delay( ((audio, source) => {
 							source.setNextSample(audio.samples, audio.samplingRate);
 						}) (audio, s),

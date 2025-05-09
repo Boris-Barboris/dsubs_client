@@ -1,7 +1,7 @@
 {
 	"name": "dsubs_client",
 	"targetType": "executable",
-	"version": "0.3.0",
+	"version": "0.5.0",
 	"authors": [
 		"Boris-Barboris"
 	],
@@ -26,6 +26,6 @@
 		}
 	],
 	"description": "DSubs multiplayer subsim client",
-	"copyright": "Copyright (C) 2017-2021, Alexander Baranin",
+	"copyright": "Copyright (C) 2017-2025, Alexander Baranin",
 	"copyFiles-windows": ["libs-win-x64/*.dll"]
 }
