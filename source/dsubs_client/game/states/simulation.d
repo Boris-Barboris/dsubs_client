@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -212,6 +212,7 @@ final class SimulatorState: GameState
 		foreach (i; 0 .. m_playerSub.tmpl.hydrophones.length)
 		{
 			m_sonarSounds ~= new StreamingSoundSource();
+			m_sonarSounds[$-1].normalize = true;
 			m_savedSoundGains[m_sonarSounds[$-1]] = 1.0f;
 		}
 		m_contactOverlayShapeCache = new ContactOverlayShapeCahe();

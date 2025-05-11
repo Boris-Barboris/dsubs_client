@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -27,6 +27,7 @@ import dsubs_common.containers.circqueue;
 
 import dsubs_client.common;
 import dsubs_client.gui;
+import dsubs_client.lib.openal: StreamingSoundSource;
 import dsubs_client.render.camera;
 import dsubs_client.render.shapes;
 import dsubs_client.core.window;
@@ -38,7 +39,7 @@ private
 {
 	enum int HEADER_FONT_SIZE = 16;
 	enum int HEADER_SECTION_HEIGHT = 26;
-	enum int VOLUME_SECTION_WIDTH = 160;
+	enum int VOLUME_SECTION_WIDTH = 300;
 }
 
 
@@ -47,6 +48,7 @@ struct WaterfallGui
 	Div root;
 	Waterfall wf;
 	Slider volumeSlider;
+	Button normalizationToggle;
 }
 
 
@@ -55,24 +57,64 @@ WaterfallGui createWaterfallPanel(const HydrophoneTemplate ht, int hydrophoneInd
 	WaterfallGui res;
 	res.wf = new Waterfall(ht, hydrophoneIndex);
 	Slider volumeSlider = new Slider();
-	volumeSlider.value = 0.5f;
+	volumeSlider.value = 0.66f;
+
+	Button normalizationToggle = builder(new Button()).content("Normalization ON").
+		fontSize(15).fixedSize(vec2i(140, 0)).build();
+
+	static float sliderToGain(float sliderValue)
+	{
+		sliderValue = (sliderValue - 0.5f) * 2;
+		return toLinear(sliderValue * toDb(short.max / 200));
+	}
+
+	static float sliderToNormalizationTarget(float sliderValue)
+	{
+		return -30.0f + sliderValue * 30.0f;
+	}
+
+	normalizationToggle.onClick += ()
+		{
+			StreamingSoundSource soundStreamer = Game.simState.
+				sonarSounds[hydrophoneIndex];
+			if (!soundStreamer.normalize)
+			{
+				soundStreamer.normalizationTarget = sliderToNormalizationTarget(
+					volumeSlider.value);
+				soundStreamer.normalize = true;
+				normalizationToggle.content = "Normalization ON";
+			}
+			else
+			{
+				soundStreamer.normalize = false;
+				normalizationToggle.content = "Normalization OFF";
+				volumeSlider.value = 0.5f;
+			}
+		};
 
 	volumeSlider.onValueChanged += (float newVal)
 		{
-			if (newVal == 0.0f)
+			StreamingSoundSource soundStreamer = Game.simState.
+				sonarSounds[hydrophoneIndex];
+			if (soundStreamer.normalize)
 			{
-				Game.simState.sonarSounds[hydrophoneIndex].gain = 0.0f;
-				return;
+				soundStreamer.normalizationTarget = sliderToNormalizationTarget(
+					volumeSlider.value);
 			}
-			newVal = (newVal - 0.5f) * 2;
-			Game.simState.sonarSounds[hydrophoneIndex].gain =
-				toLinear(newVal * toDb(short.max / 200));
+			else
+			{
+				if (newVal == 0.0f)
+					soundStreamer.gain = 0.0f;
+				else
+					soundStreamer.gain = sliderToGain(newVal);
+			}
 		};
 
 	Div volumeDiv = builder(hDiv([
 		builder(new Label()).content("Volume:").fontSize(HEADER_FONT_SIZE).
 			layoutType(LayoutType.CONTENT).build(),
-		volumeSlider
+		volumeSlider,
+		normalizationToggle
 	])).fixedSize(vec2i(VOLUME_SECTION_WIDTH, HEADER_SECTION_HEIGHT)).build;
 
 	Div header = builder(hDiv([
@@ -86,6 +128,7 @@ WaterfallGui createWaterfallPanel(const HydrophoneTemplate ht, int hydrophoneInd
 		res.wf
 	])).backgroundColor(COLORS.simPanelBgnd).mouseTransparent(false).build;
 	res.volumeSlider = volumeSlider;
+	res.normalizationToggle = normalizationToggle;
 
 	return res;
 }

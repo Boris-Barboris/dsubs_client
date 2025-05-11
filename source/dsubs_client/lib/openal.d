@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -28,6 +28,8 @@ import std.stdio;
 import std.process;
 
 import derelict.openal.al;
+
+import dsubs_common.math: toLinear, toDb;
 
 import dsubs_client.common;
 
@@ -108,7 +110,7 @@ void cleanupSoundResources()
 }
 
 /// Sound source that can be appended to. At most one buffer is enqueued, new
-/// buffers will cause rewind. Works with 1-second samples.
+/// buffers will cause time-skip. Works with 1-second samples.
 final class StreamingSoundSource
 {
 	this()
@@ -130,8 +132,13 @@ final class StreamingSoundSource
 	{
 		ALuint source;
 
-		// enum float TARGET_MAX = short.max * 0.8f;
-		enum float MAX_GAIN = float.max;	// +30 dB
+		enum float MAX_GAIN = float.max;
+
+		enum float NORMALIZATION_GAIN_INCREASE_LIMIT = 5.0f;	// db per second
+		float m_normalizationTarget = -10.0f;	// -10db from max possible
+		float m_calculatedGain = 1.0f;	// gain that must be applied to the next buffer
+										// in order to achieve
+										// m_normalizationTarget volume
 
 		bool m_stopFlag;
 		Condition m_cond;
@@ -145,6 +152,11 @@ final class StreamingSoundSource
 		Duration m_endMargin = msecs(50);
 		MonoTime m_wakeupDeadline;
 	}
+
+	/// Set to true in order to enable volume normalizaiton. When enabled, appended
+	/// sound is analyzed to estimate the loudest part, and the resulting estimate is
+	/// used to set the gain automatically.
+	bool normalize;
 
 	~this()
 	{
@@ -203,6 +215,8 @@ final class StreamingSoundSource
 			alSourceQueueBuffers(source, 1, &m_curBuf);
 			openalCheckErr("Cannot enqueue buffer: ");
 			m_curBuf = ALuint.max;
+			if (normalize && gain != 0.0f)
+				gain = m_calculatedGain;
 			if (ensurePlaying())
 			{
 				m_wakeupDeadline = m_wakeupDeadline + seconds(1);
@@ -213,6 +227,24 @@ final class StreamingSoundSource
 			}
 			Thread.sleep(m_wakeupDeadline - MonoTime.currTime);
 		}
+	}
+
+	private float estimateSampleLoudness(short[] samples)
+	{
+		float sumOfSquaresMax = -float.infinity;
+		enum int PARTITION_COUNT = 4;
+		for (size_t partition = 0; partition < PARTITION_COUNT; partition++)
+		{
+			float sumOfSquares = 0.0f;
+			size_t offset = partition * samples.length / PARTITION_COUNT;
+			// don't square every sample but only every 4th, save some time.
+			for (size_t i = 0; i < samples.length / 4; i+=4)
+				sumOfSquares += pow(samples[offset + i] / cast(float) short.max, 2);
+			sumOfSquares /= samples.length / 4 / PARTITION_COUNT;
+			if (sumOfSquares > sumOfSquaresMax)
+				sumOfSquaresMax = sumOfSquares;
+		}
+		return sumOfSquaresMax;
 	}
 
 	/// The next sample to append to stream will be this one.
@@ -230,6 +262,22 @@ final class StreamingSoundSource
 		// 	mgain = min(MAX_GAIN, TARGET_MAX / smax);
 		// foreach (ref s; samples)
 		// 	s = lrint(float(s) * mgain).to!short;
+		if (normalize)
+		{
+			float esimatedMeanSquare = estimateSampleLoudness(samples);
+			// max required to protect from divByZero
+			float estimatedAvgPeak = max(1e-6, sqrt(esimatedMeanSquare));
+			float newCalcGain = toLinear(m_normalizationTarget) / estimatedAvgPeak;
+			if (m_calculatedGain > newCalcGain)
+				m_calculatedGain = newCalcGain;	// we drop the volume instantly...
+			else
+			{
+				// but the increase in gain must be gradual to prevent annyoyance
+				float gainIncrease = min(NORMALIZATION_GAIN_INCREASE_LIMIT,
+					toDb(newCalcGain / m_calculatedGain));
+				m_calculatedGain = m_calculatedGain * toLinear(gainIncrease);
+			}
+		}
 		alBufferData(newBuf, AL_FORMAT_MONO16, samples.ptr,
 			(samples.length * short.sizeof).to!int, srate);
 		openalCheckErr("Unable to fill audio buffer with data: ");
@@ -256,6 +304,19 @@ final class StreamingSoundSource
 		int srate, byteCount;
 		loadWavFile(path, samples, byteCount, srate);
 		setNextSample(samples, srate);
+	}
+
+	// in decibels
+	float normalizationTarget() const
+	{
+		return m_normalizationTarget;
+	}
+
+	// in decibels
+	void normalizationTarget(float rhs)
+	{
+		enforce(rhs <= 0, "Normalization target must be negative");
+		m_normalizationTarget = rhs;
 	}
 
 	@property void gain(float rhs)
