@@ -39,7 +39,7 @@ struct CICLoginRes
 {
 	__gshared const int g_marshIdx;
 	@MaxLenAttr(32) immutable(ubyte)[] dbHash;	/// entity database hash (SHA256)
-	int apiVersion = 13;
+	int apiVersion = 14;
 }
 
 /// CIC client sends this to receive entity DB
@@ -385,4 +385,18 @@ struct CICSimulatorPausedRes
 {
 	__gshared const int g_marshIdx;
 	bool isPaused;
+}
+
+/// Non-persistent simulators can change their time acceleration factor
+struct CICTimeAccelerationReq
+{
+	__gshared const int g_marshIdx;
+	TimeAccelerationReq req;
+}
+
+/// Simulator broadcasts it's time acceleration after TimeAccelerationReq.
+struct CICTimeAccelerationRes
+{
+	__gshared const int g_marshIdx;
+	TimeAccelerationRes res;
 }

@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -99,6 +99,7 @@ final class WorldManager: IWindowDrawer, IWindowEventSubrouter
 		components.length = 0;
 		foreach (ref arr; m_mouseReceivers)
 			arr.length = 0;
+		timeAccelerationFactor = 10;
 	}
 
 	this(Window wnd)
@@ -107,11 +108,15 @@ final class WorldManager: IWindowDrawer, IWindowEventSubrouter
 		components.reserve(512);
 	}
 
+	// needed to handle server-side time acceleration
+	short timeAccelerationFactor = 10;
+
 	void draw(Window wnd, long usecsDelta)
 	{
 		// TODO: maybe spread load on a thread pool
+		long worldTimePassed = usecsDelta * timeAccelerationFactor / 10;
 		foreach (comp; components)
-			comp.update(camCtx, usecsDelta);
+			comp.update(camCtx, worldTimePassed);
 		// and sort them in Z-order, deepest components first
 		// sort!((a, b) => a.depth < b.depth)(components[]);
 		// apply camera transformation

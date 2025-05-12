@@ -149,4 +149,5 @@ private:
 	mixin(passToBackendMixin!(CICSetTubeStateReq));
 	mixin(passToBackendMixin!(CICLaunchTubeReq));
 	mixin(passToBackendMixin!(CICPauseSimulatorReq));
+	mixin(passToBackendMixin!(CICTimeAccelerationReq));
 }

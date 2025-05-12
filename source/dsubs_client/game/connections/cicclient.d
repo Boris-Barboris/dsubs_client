@@ -468,4 +468,12 @@ private:
 			Game.simState.gui.handleCICSimulatorPausedRes(msg);
 		}
 	}
+
+	void h_timeAccelerationRes(CICTimeAccelerationRes msg)
+	{
+		synchronized(Game.mainMutexWriter)
+		{
+			Game.simState.gui.handleCICTimeAccelerationRes(msg);
+		}
+	}
 }

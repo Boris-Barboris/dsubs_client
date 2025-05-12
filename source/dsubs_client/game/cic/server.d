@@ -366,6 +366,15 @@ final class CICServer
 		m_listener.broadcast(cast(immutable) CICSimulatorPausedRes(res.isPaused));
 	}
 
+	void handleTimeAccelerationRes(TimeAccelerationRes res)
+	{
+		synchronized(m_state.rsMut)
+		{
+			m_state.handleTimeAccelerationRes(res);
+		}
+		m_listener.broadcast(cast(immutable) CICTimeAccelerationRes(res));
+	}
+
 	/*
 	Contact management.
 	*/

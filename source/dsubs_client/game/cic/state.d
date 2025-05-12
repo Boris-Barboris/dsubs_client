@@ -227,6 +227,11 @@ final class CICState: Persistable
 		m_recState.isPaused = res.isPaused;
 	}
 
+	void handleTimeAccelerationRes(TimeAccelerationRes res)
+	{
+		m_recState.timeAccelerationFactor = res.timeAccelerationFactor;
+	}
+
 	/// Contact and it's data.
 	private struct ContactContext
 	{

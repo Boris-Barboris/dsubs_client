@@ -149,6 +149,7 @@ private:
 	mixin(passToCICMixin!(MapOverlayUpdateRes));
 	mixin(passToCICMixin!(ChatMessageRes));
 	mixin(passToCICMixin!(SimulatorPausedRes));
+	mixin(passToCICMixin!(TimeAccelerationRes));
 
 	void h_simulatorTerminatingRes(SimulatorTerminatingRes res)
 	{

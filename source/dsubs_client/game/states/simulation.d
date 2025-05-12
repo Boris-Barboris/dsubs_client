@@ -76,6 +76,11 @@ final class SimulatorState: GameState
 
 	@property bool isPaused() const { return m_recState.rawState.isPaused; }
 
+	@property short timeAccelerationFactor() const
+	{
+		return m_recState.rawState.timeAccelerationFactor;
+	}
+
 	private
 	{
 		float[StreamingSoundSource] m_savedSoundGains;
@@ -165,8 +170,8 @@ final class SimulatorState: GameState
 	{
 		return m_lastServerTime +
 			max(0,
-				min(1000_000L, (Game.render.frameStartTime -
-					Game.simState.lastServerTimeOnClient).total!"usecs"));
+				(Game.render.frameStartTime - Game.simState.lastServerTimeOnClient).
+					total!"usecs") * timeAccelerationFactor / 10;
 	}
 
 	override void setup()
@@ -184,6 +189,7 @@ final class SimulatorState: GameState
 		// set up camera
 		Game.worldManager.camCtx.camera.center = rawRecState.subSnap.position;
 		Game.worldManager.camCtx.camera.zoom = 10.0;
+		Game.worldManager.timeAccelerationFactor = rawRecState.timeAccelerationFactor;
 		m_camController = new CameraController(Game.worldManager.camCtx.camera);
 
 		// set tactical overlay
@@ -280,6 +286,7 @@ final class SimulationGUI
 		WireUi[] m_wireUis;
 		Button m_abandonBtn;
 		Button m_pauseBtn;
+		Button m_timeAccelBtn;
 	}
 
 	@property WireUi[] wireUis() { return m_wireUis; }
@@ -408,6 +415,17 @@ final class SimulationGUI
 		m_pauseBtn.content = pauseBtnContent(res.isPaused);
 	}
 
+	void handleCICTimeAccelerationRes(CICTimeAccelerationRes res)
+	{
+		if (m_timeAccelBtn is null)
+			return;
+		enforce(res.res.timeAccelerationFactor > 0, "invalid accel factor");
+		Game.simState.m_recState.rawState.timeAccelerationFactor =
+			res.res.timeAccelerationFactor;
+		Game.worldManager.timeAccelerationFactor = res.res.timeAccelerationFactor;
+		m_timeAccelBtn.content = timeAccelBtnContent(res.res.timeAccelerationFactor);
+	}
+
 	void handleCICScenarioGoalUpdateRes(CICScenarioGoalUpdateRes msg)
 	{
 		// rebuild list of collapsables while updating existing ones
@@ -442,6 +460,11 @@ final class SimulationGUI
 			return "\u25ba";
 		else
 			return "\u05f0";
+	}
+
+	private static string timeAccelBtnContent(short factor)
+	{
+		return format("x%g", factor / 10.0f);
 	}
 
 	this(bool canAbandon, bool canPause)
@@ -657,6 +680,53 @@ final class SimulationGUI
 			];
 		if (canPause)
 		{
+			short currentAccel = Game.simState.timeAccelerationFactor;
+
+			Button[] timeAccelerationButtons;
+			timeAccelerationButtons ~= builder(new Button()).fontSize(15).
+				content("x1 normal").build();
+			timeAccelerationButtons[$-1].onClick += () {
+				Game.ciccon.sendMessage(immutable CICTimeAccelerationReq(
+					TimeAccelerationReq(10)));
+			};
+			timeAccelerationButtons ~= builder(new Button()).fontSize(15).
+				content("x2 speed").build();
+			timeAccelerationButtons[$-1].onClick += () {
+				Game.ciccon.sendMessage(immutable CICTimeAccelerationReq(
+					TimeAccelerationReq(20)));
+			};
+			timeAccelerationButtons ~= builder(new Button()).fontSize(15).
+				content("x4 speed").build();
+			timeAccelerationButtons[$-1].onClick += () {
+				Game.ciccon.sendMessage(immutable CICTimeAccelerationReq(
+					TimeAccelerationReq(40)));
+			};
+			timeAccelerationButtons ~= builder(new Button()).fontSize(15).
+				content("x8 speed").build();
+			timeAccelerationButtons[$-1].onClick += () {
+				Game.ciccon.sendMessage(immutable CICTimeAccelerationReq(
+					TimeAccelerationReq(80)));
+			};
+			timeAccelerationButtons ~= builder(new Button()).fontSize(15).
+				content("x0.5 half").build();
+			timeAccelerationButtons[$-1].onClick += () {
+				Game.ciccon.sendMessage(immutable CICTimeAccelerationReq(
+					TimeAccelerationReq(5)));
+			};
+
+			m_timeAccelBtn = builder(new Button()).
+				content(timeAccelBtnContent(currentAccel)).fontSize(BTN_FONT).
+				fixedSize(vec2i(BTN_FONT + 20, BIG_BTN_FONT)).build;
+			m_timeAccelBtn.onClick += () {
+				ContextMenu menu = contextMenu(
+					Game.guiManager,
+					timeAccelerationButtons,
+					Game.window.size,
+					vec2i(m_timeAccelBtn.position.x, m_timeAccelBtn.position.y),
+					20);
+			};
+			bottomDivEls ~= m_timeAccelBtn;
+
 			bool pausedNow = Game.simState.isPaused;
 			m_pauseBtn = builder(new Button(ButtonType.ASYNC)).
 				fontName("SansMono").
