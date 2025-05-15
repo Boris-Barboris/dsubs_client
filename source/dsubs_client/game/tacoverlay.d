@@ -506,6 +506,7 @@ final class TacticalOverlay: Overlay
 	{
 		CameraController m_camCtrl;
 		int m_mousePrevX, m_mousePrevY;
+		int m_panDist;
 		bool m_panned;	/// true when mouse has moved since RMB down
 		TacticalContactElement m_selectedContact;
 		ContactDataOverlayElement[int] m_selectedContactData;
@@ -624,6 +625,7 @@ final class TacticalOverlay: Overlay
 	override void onPanStart(int x, int y)
 	{
 		m_panned = false;
+		m_panDist = 0;
 		m_mousePrevX = x;
 		m_mousePrevY = y;
 	}
@@ -689,8 +691,13 @@ final class TacticalOverlay: Overlay
 
 	override void onPan(int x, int y)
 	{
-		if (m_mousePrevX != x || m_mousePrevY != y)
-			m_panned = true;	// we have moved the mouse
+		if (!m_panned && (m_mousePrevX != x || m_mousePrevY != y))
+		{
+			m_panDist += abs(x - m_mousePrevX);
+			m_panDist += abs(y - m_mousePrevY);
+			if (m_panDist > 2)		// register right click even after small jitter
+				m_panned = true;	// we have moved the mouse
+		}
 		m_camCtrl.onPan(x - m_mousePrevX, y - m_mousePrevY);
 		m_mousePrevX = x;
 		m_mousePrevY = y;
