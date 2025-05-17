@@ -251,6 +251,12 @@ final class SimulatorState: GameState
 		error("SimulatorTerminatingRes received, jumping to death screen");
 		Game.activeState = new DeathScreenState();
 	}
+
+	void requestTimeAccelerationFactor(short requestedFactor)
+	{
+		Game.ciccon.sendMessage(
+			immutable CICTimeAccelerationReq(TimeAccelerationReq(requestedFactor)));
+	}
 }
 
 
@@ -682,37 +688,58 @@ final class SimulationGUI
 		{
 			short currentAccel = Game.simState.timeAccelerationFactor;
 
+			// time acceleration setup
 			Button[] timeAccelerationButtons;
+
 			timeAccelerationButtons ~= builder(new Button()).fontSize(15).
 				content("x1 normal").build();
 			timeAccelerationButtons[$-1].onClick += () {
-				Game.ciccon.sendMessage(immutable CICTimeAccelerationReq(
-					TimeAccelerationReq(10)));
+				Game.simState.requestTimeAccelerationFactor(10);
 			};
+			Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum1), ()
+			{
+				Game.simState.requestTimeAccelerationFactor(10);
+			});
+
 			timeAccelerationButtons ~= builder(new Button()).fontSize(15).
 				content("x2 speed").build();
 			timeAccelerationButtons[$-1].onClick += () {
-				Game.ciccon.sendMessage(immutable CICTimeAccelerationReq(
-					TimeAccelerationReq(20)));
+				Game.simState.requestTimeAccelerationFactor(20);
 			};
+			Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum2), ()
+			{
+				Game.simState.requestTimeAccelerationFactor(20);
+			});
+
 			timeAccelerationButtons ~= builder(new Button()).fontSize(15).
 				content("x4 speed").build();
 			timeAccelerationButtons[$-1].onClick += () {
-				Game.ciccon.sendMessage(immutable CICTimeAccelerationReq(
-					TimeAccelerationReq(40)));
+				Game.simState.requestTimeAccelerationFactor(40);
 			};
+			Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum3), ()
+			{
+				Game.simState.requestTimeAccelerationFactor(40);
+			});
+
 			timeAccelerationButtons ~= builder(new Button()).fontSize(15).
 				content("x8 speed").build();
 			timeAccelerationButtons[$-1].onClick += () {
-				Game.ciccon.sendMessage(immutable CICTimeAccelerationReq(
-					TimeAccelerationReq(80)));
+				Game.simState.requestTimeAccelerationFactor(80);
 			};
+			Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum4), ()
+			{
+				Game.simState.requestTimeAccelerationFactor(80);
+			});
+
 			timeAccelerationButtons ~= builder(new Button()).fontSize(15).
 				content("x0.5 half").build();
 			timeAccelerationButtons[$-1].onClick += () {
-				Game.ciccon.sendMessage(immutable CICTimeAccelerationReq(
-					TimeAccelerationReq(5)));
+				Game.simState.requestTimeAccelerationFactor(5);
 			};
+			Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum5), ()
+			{
+				Game.simState.requestTimeAccelerationFactor(5);
+			});
 
 			m_timeAccelBtn = builder(new Button()).
 				content(timeAccelBtnContent(currentAccel)).fontSize(BTN_FONT).
