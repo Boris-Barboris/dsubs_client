@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 module dsubs_client.gui.div;
 
 import std.algorithm;
+import std.array: insertInPlace;
 import std.experimental.logger;
 import std.conv: to;
 import std.math;
@@ -28,6 +29,8 @@ public import gfm.math.vector;
 import derelict.sfml2.graphics;
 import derelict.sfml2.system;
 import derelict.sfml2.window;
+
+import dsubs_common.containers.array;
 
 import dsubs_client.lib.sfml;
 import dsubs_client.core.window;
@@ -54,12 +57,16 @@ class Div: GuiElement
 
 	private
 	{
-		private GuiElement[] m_children;
-		bool m_updatingKids = false;	/// anti-recusrion flag.
 		int m_borderWidth = 0;
-		sfColor m_borderColor = sfTransparent;
 		/// array of rectangles representing external border
 		sfRectangleShape*[4] m_divBorders;
+		GuiElement[] m_children;
+	}
+
+	protected
+	{
+		bool m_updatingKids = false;	/// anti-recusrion flag.
+		sfColor m_borderColor = sfTransparent;
 		/// array of rectangles that are used to draw inter-child borders
 		sfRectangleShape*[] m_cellBorders;
 	}
@@ -119,7 +126,7 @@ class Div: GuiElement
 
 	mixin FinalGetSet!(sfColor, "borderColor", "updateBorderColor();");
 
-	private void updateBorderColor()
+	protected void updateBorderColor()
 	{
 		foreach (r; m_cellBorders)
 			sfRectangleShape_setFillColor(r, m_borderColor);
@@ -127,21 +134,88 @@ class Div: GuiElement
 			sfRectangleShape_setFillColor(r, m_borderColor);
 	}
 
+	private void addNewCellBorder()
+	{
+		sfRectangleShape* brd = sfRectangleShape_create();
+		sfRectangleShape_setOutlineThickness(brd, 0);
+		sfRectangleShape_setFillColor(brd, m_borderColor);
+		m_cellBorders ~= brd;
+	}
+
+	private void removeLastCellBorder()
+	{
+		if (m_cellBorders.length == 0)
+			return;
+		sfRectangleShape_destroy(m_cellBorders[$-1]);
+		m_cellBorders.length -= 1;
+	}
+
 	/// set idx child in children array to newChild and return
 	/// the old one.
 	GuiElement setChild(GuiElement newChild, size_t idx)
 	{
-		GuiElement old = m_children[idx];
-		old.parent = null;
-		old.parentViewport = null;
-		old.onHide();
+		GuiElement old;
+		if (idx < m_children.length)
+		{
+			old = m_children[idx];
+			old.parent = null;
+			old.parentViewport = null;
+			old.onHide();
+		}
+		else
+			addNewCellBorder();
 		newChild.parent = this;
 		newChild.parentViewport = &viewport();
 		m_children[idx] = newChild;
+		onChildrenSetChanged();
+		return old;
+	}
+
+	/// add new child, it's new index in the children array will be atIdx
+	void addChild(GuiElement newChild, size_t atIdx)
+	{
+		assert(atIdx <= m_children.length);
+		addNewCellBorder();
+		newChild.parent = this;
+		newChild.parentViewport = &viewport();
+		m_children.insertInPlace(atIdx, newChild);
+		onChildrenSetChanged();
+	}
+
+	GuiElement removeChildAt(size_t atIdx)
+	{
+		assert(atIdx < m_children.length);
+		GuiElement old = m_children[atIdx];
+		old.parent = null;
+		old.parentViewport = null;
+		old.onHide();
+		m_children = m_children.remove(atIdx);
+		removeLastCellBorder();
+		onChildrenSetChanged();
+		return old;
+	}
+
+	bool removeChild(GuiElement child)
+	{
+		if (child is null)
+			return false;
+		if (removeFirst(m_children, child))
+		{
+			child.parent = null;
+			child.parentViewport = null;
+			child.onHide();
+			removeLastCellBorder();
+			onChildrenSetChanged();
+			return true;
+		}
+		return false;
+	}
+
+	protected void onChildrenSetChanged()
+	{
 		if (layoutType == LayoutType.CONTENT)
 			fitContent(fixedAxis, size[odim]);
 		updateChildren();
-		return old;
 	}
 
 	override void childChanged(GuiElement child)
@@ -169,7 +243,7 @@ class Div: GuiElement
 	}
 
 	// we don't display external border if our parent is div
-	private @property int externalBorder() const
+	protected final @property int externalBorder() const
 	{
 		if (extBordersHidden)
 			return 0;
@@ -236,12 +310,17 @@ class Div: GuiElement
 		return requiredSize;
 	}
 
+	protected int pureChildrenBudget()
+	{
+		return size[dim] - m_borderWidth * (m_children.length.to!int - 1) -
+			2 * externalBorder;
+	}
+
 	// recalculate children layout
-	private void updateChildren()
+	protected void updateChildren()
 	{
 		m_updatingKids = true;
-		int intBudget = size[dim] - m_borderWidth * (m_children.length.to!int - 1) -
-			2 * externalBorder;
+		int intBudget = pureChildrenBudget();
 		float budget = max(0, intBudget);
 		// fixed-sized kids go first
 		int childCount = 0;

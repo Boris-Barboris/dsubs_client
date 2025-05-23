@@ -28,6 +28,7 @@ import dsubs_common.containers.circqueue;
 import dsubs_client.common;
 import dsubs_client.gui;
 import dsubs_client.lib.openal: StreamingSoundSource;
+import dsubs_client.lib.sfml: tosf;
 import dsubs_client.render.camera;
 import dsubs_client.render.shapes;
 import dsubs_client.core.window;
@@ -179,7 +180,7 @@ class PanoramicDisplay(DataIntType): GuiElement
 	@property void camera(Camera2D rhs)
 	{
 		m_camera = rhs;
-		onCameraChange();
+		onCameraChangeDefault();
 	}
 
 	private PanoramicOverlay m_overlay;
@@ -251,11 +252,17 @@ class PanoramicDisplay(DataIntType): GuiElement
 			lbl.fontColor = sfWhite;
 			lbl.htextAlign = HTextAlign.CENTER;
 			lbl.content = (i * 90).to!string;
+			lbl.parent = this;
+			lbl.parentViewport = &viewport();
 			m_compassLabels[i] = lbl;
 		}
 		m_underCursorLabel = builder(new Label()).fontSize(compassFontSize).
 			size(vec2i(150, m_compassHeight)).fontColor(sfYellow).
 			htextAlign(HTextAlign.CENTER).build();
+		m_underCursorLabel.parent = this;
+		m_underCursorLabel.parentViewport = &viewport();
+
+		onCameraChange += &onCameraChangeDefault;
 	}
 
 	override void onHide()
@@ -285,7 +292,7 @@ class PanoramicDisplay(DataIntType): GuiElement
 	/// screen-space height of the area to draw renderTexture to
 	final @property int contentHeight() const
 	{
-		return size.y - m_headerHeight;
+		return max(0, size.y - m_headerHeight);
 	}
 
 	/// draw one row of data to renderTexture.
@@ -344,7 +351,9 @@ class PanoramicDisplay(DataIntType): GuiElement
 		sfRenderTexture_setActive(m_renderTexture, sfFalse);
 	}
 
-	protected void onCameraChange()
+	Event!(void delegate()) onCameraChange;
+
+	protected void onCameraChangeDefault()
 	{
 		constraintCamera();
 		updateTexCoords();
@@ -354,7 +363,15 @@ class PanoramicDisplay(DataIntType): GuiElement
 	/// Dirty hack to rebuild view from external camera
 	final void onShowRebuildFromCamera()
 	{
-		onCameraChange();
+		onCameraChangeDefault();
+	}
+
+	// subscribe to events of all other displays, that are not this
+	void synchronizeCameraWith(typeof(this)[] otherDisplays)
+	{
+		foreach (disp; otherDisplays)
+			if (disp !is this)
+				disp.onCameraChange += &onCameraChangeDefault;
 	}
 
 	private void constraintCamera()
@@ -843,12 +860,14 @@ final class Waterfall: PanoramicDisplay!ushort
 		{
 			mouseTransparent = false;
 			enableScissorTest = false;
+			// backgroundVisible = true;
+			// backgroundColor = sfColor(0, 255, 255, 50);
 			onMouseUp += &processMouseUp;
 		}
 
 		override vec2d world2screenPos(vec2d world)
 		{
-			return position + vec2d(bearingToPixel(world.x), m_dirHeaderHeight / 2);
+			return position + vec2d(bearingToPixel(world.x), 0);
 		}
 
 		override vec2d screen2worldPos(vec2d screen)
@@ -909,7 +928,7 @@ final class Waterfall: PanoramicDisplay!ushort
 		{
 			float m_bearing;
 			LineShape m_line;
-			enum sfColor PEAK_COLOR = sfColor(255, 255, 255, 100);
+			enum sfColor PEAK_COLOR = sfColor(255, 200, 200, 120);
 			enum float PEAK_HEIGHT = 14;
 		}
 
@@ -924,8 +943,10 @@ final class Waterfall: PanoramicDisplay!ushort
 
 		override void onPreDraw()
 		{
-			double screenX = owner.world2screenPos(vec2d(m_bearing, 0)).x;
-			m_line.transform.position = vec2d(screenX, m_dirHeaderHeight);
+			vec2d screenPos = owner.world2screenPos(vec2d(m_bearing, 0));
+			m_line.transform.position = vec2d(
+				screenPos.x - owner.position.x,
+				m_dirHeaderHeight);
 		}
 
 		override void draw(Window wnd, long usecsDelta)

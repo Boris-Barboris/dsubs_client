@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -19,6 +19,7 @@ module dsubs_client.gui.overlay;
 
 import derelict.sfml2.graphics;
 
+import dsubs_client.common;
 import dsubs_client.math.transform;
 import dsubs_client.render.camera;
 import dsubs_client.core.utils;

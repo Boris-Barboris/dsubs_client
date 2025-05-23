@@ -67,7 +67,7 @@ final class SimulatorState: GameState
 	mixin Readonly!(CameraController, "camController");
 	mixin Readonly!(SimulationGUI, "gui");
 	mixin Readonly!(StreamingSoundSource[], "sonarSounds");
-	mixin Readonly!(StreamingSoundSource, "activeSonarSound");
+	mixin Readonly!(StreamingSoundSource, "primarySonarSound");
 	mixin Readonly!(usecs_t, "lastServerTime");
 	mixin Readonly!(ContactOverlayShapeCahe, "contactOverlayShapeCache");
 	mixin Readonly!(ClientContactManager, "contactManager");
@@ -83,24 +83,20 @@ final class SimulatorState: GameState
 
 	private
 	{
-		float[StreamingSoundSource] m_savedSoundGains;
 		WireGuidedWeaponIcon[string] m_wireGuidedIcons;
 	}
 
-	@property void activeSonarSound(StreamingSoundSource rhs)
+	// mute all sources other than rhs
+	@property void primarySonarSound(StreamingSoundSource rhs)
 	{
-		if (m_activeSonarSound !is rhs)
+		if (m_primarySonarSound !is rhs || rhs is null)
 		{
-			if (m_activeSonarSound)
-			{
-				m_savedSoundGains[m_activeSonarSound] = m_activeSonarSound.gain;
-				m_activeSonarSound.gain = 0.0f;
-			}
-			if (rhs)
-			{
-				rhs.gain = m_savedSoundGains[rhs];
-			}
-			m_activeSonarSound = rhs;
+			if (m_primarySonarSound)
+				m_primarySonarSound.gain = 0.0f;
+			foreach (soundSource; m_sonarSounds)
+				if (soundSource !is rhs)
+					soundSource.gain = 0.0f;
+			m_primarySonarSound = rhs;
 		}
 	}
 
@@ -193,13 +189,14 @@ final class SimulatorState: GameState
 		m_camController = new CameraController(Game.worldManager.camCtx.camera);
 
 		// set tactical overlay
+		// TODO: bind tactical overlay to tiler segment and not a separate panel
 		m_tacticalOverlay = new TacticalOverlay(m_camController);
-		Game.guiManager.addPanel(new Panel(m_tacticalOverlay));
+		// Game.guiManager.addPanel(new Panel(m_tacticalOverlay));
 		m_playerSubIcon = new PlayerSubIcon(m_tacticalOverlay, m_playerSub);
 		m_tacticalOverlay.updateScenarioElements(rawRecState.mapElements);
 
 		bool isCicClient = Game.bconm.stopped;
-		m_gui = new SimulationGUI(
+		m_gui = new SimulationGUI(m_tacticalOverlay,
 			rawRecState.canAbandon && !isCicClient, rawRecState.canBePaused);
 		foreach (i, listenDir; rawRecState.listenDirs)
 			m_gui.waterfalls[i].listenDir = listenDir;
@@ -219,7 +216,6 @@ final class SimulatorState: GameState
 		{
 			m_sonarSounds ~= new StreamingSoundSource();
 			m_sonarSounds[$-1].normalize = true;
-			m_savedSoundGains[m_sonarSounds[$-1]] = 1.0f;
 		}
 		m_contactOverlayShapeCache = new ContactOverlayShapeCahe();
 		m_contactManager = new ClientContactManager(
@@ -288,6 +284,9 @@ final class SimulationGUI
 		Div m_topLevelDiv;
 		Div m_objectivesVdiv;
 		Div m_divWithLeftPad;
+		Div m_middleMainTacticalDiv;
+		Stack m_tacticalScreenStack;
+		TilerDiv m_mainTilerDiv;
 		TubeUI[int] tubeUis;
 		WireUi[] m_wireUis;
 		Button m_abandonBtn;
@@ -473,7 +472,7 @@ final class SimulationGUI
 		return format("x%g", factor / 10.0f);
 	}
 
-	this(bool canAbandon, bool canPause)
+	this(TacticalOverlay tacOverlay, bool canAbandon, bool canPause)
 	{
 		Submarine playerSub = Game.simState.playerSub;
 
@@ -516,6 +515,19 @@ final class SimulationGUI
 		Button asonarTab = builder(new Button()).content("F" ~ tabId.to!string ~
 			" Active sonar").fontSize(BIG_BTN_FONT).build;
 
+		Button unlockTilingBtn = builder(new Button()).content("ulock").
+			fontColor(COLORS.loadoutHint).
+			fontSize(BTN_FONT).fixedSize(vec2i(55, BTN_FONT)).build;
+
+		unlockTilingBtn.onClick += {
+			bool oldMode = m_mainTilerDiv.editMode;
+			m_mainTilerDiv.editMode = !oldMode;
+			if (oldMode)
+				unlockTilingBtn.content = "ulock";
+			else
+				unlockTilingBtn.content = "lock";
+		};
+
 		Button splitWindowTab = builder(new Button()).fontName("STIX2Math").content("⧉").
 			fontSize(BIG_BTN_FONT).fixedSize(vec2i(BIG_BTN_FONT + 4, BIG_BTN_FONT)).build;
 
@@ -526,7 +538,8 @@ final class SimulationGUI
 				null, Config.detached | Config.suppressConsole);
 		};
 
-		tabs ~= [tacticalTab] ~ hydrophoneTabs ~ [asonarTab, splitWindowTab];
+		tabs ~= [tacticalTab] ~ hydrophoneTabs ~
+			[asonarTab, unlockTilingBtn, splitWindowTab];
 
 		int[] tabIdxToHotkeyKey;
 		tabIdxToHotkeyKey.length = 8;
@@ -799,7 +812,7 @@ final class SimulationGUI
 		else
 			goalsHdivEl = filler();
 
-		GuiElement middleMainDiv = builder(vDiv([
+		m_middleMainTacticalDiv = builder(vDiv([
 			filler(20),
 			goalsHdivEl,
 			builder(hDiv(cast(GuiElement[]) tubeUiDivs ~ wireVertDiv)).
@@ -807,27 +820,43 @@ final class SimulationGUI
 				borderWidth(8).build
 		])).build;
 
-		bool[Div] passiveSonarDivs;
+		m_tacticalScreenStack = builder(new Stack([
+			tacOverlay, m_middleMainTacticalDiv])).fraction(1000.0f).build();
+		// fraction 1000 is a hack to prevent F2... windows from collapsing on their
+		// exclusive mode
+
 		foreach (i, hydroTmpl; playerSub.tmpl.hydrophones)
 		{
 			m_passiveGuis ~= createWaterfallPanel(hydroTmpl, i.to!int);
-			passiveSonarDivs[m_passiveGuis[$-1].root] = true;
+			m_passiveGuis[$-1].root.fraction = 1000.0f;
 		}
 		// synchronize waterfall cameras
-		for (int i = 1; i < m_passiveGuis.length; i++)
+		for (int i = 0; i < m_passiveGuis.length; i++)
+		{
 			m_passiveGuis[i].wf.camera = m_passiveGuis[0].wf.camera;
+			m_passiveGuis[i].wf.synchronizeCameraWith(
+				cast(PanoramicDisplay!ushort[]) array(m_passiveGuis.map!(gui => gui.wf)));
+		}
+		// active sonar gui
 		m_sonarGui = createSonarGui(playerSub.tmpl.sonar);
+		m_sonarGui.root.fraction = 1000.0f;
+
+		// create main tiler
+		MainViewTiler tilerState = new MainViewTiler(m_passiveGuis, m_sonarGui);
+		m_mainTilerDiv = builder(hTilerDiv(tilerState, [m_tacticalScreenStack])).
+			borderWidth(6).build;
+		m_mainTilerDiv.markChildUnremovable(m_tacticalScreenStack);
 
 		m_topLevelDiv = builder(vDiv([
 			tabDiv,
-			middleMainDiv,
+			m_mainTilerDiv,
 			bottomDiv
 		])).build;
 
 		void setMiddlePane(GuiElement el)
 		{
 			m_topLevelDiv.setChild(el, 1);
-			if (el is middleMainDiv)
+			if (el is m_mainTilerDiv)
 				Game.simState.tacticalOverlay.hidden = false;
 			else
 				Game.simState.tacticalOverlay.hidden = true;
@@ -836,23 +865,115 @@ final class SimulationGUI
 
 		tacticalTab.onClick += ()
 		{
-			Game.simState.activeSonarSound = null;
-			setMiddlePane(middleMainDiv);
+			// Game.simState.primarySonarSound = null;
+			setMiddlePane(m_mainTilerDiv);
+			updateSoundGainsForTactical(tilerState.m_waterfallsTiled);
 		};
 		foreach (i, btn; hydrophoneTabs)
 		{
 			btn.onClick += ((i) => {
-				Game.simState.activeSonarSound = Game.simState.sonarSounds[i];
+				Game.simState.primarySonarSound = Game.simState.sonarSounds[i];
+				Game.simState.sonarSounds[i].gain = m_passiveGuis[i].volumeSlider.value;
 				setMiddlePane(m_passiveGuis[i].root);
-				m_passiveGuis[i].wf.onShowRebuildFromCamera();
+				// m_passiveGuis[i].wf.onShowRebuildFromCamera();
 			})(i);
 		}
 		asonarTab.onClick += ()
 		{
-			Game.simState.activeSonarSound = null;
+			Game.simState.primarySonarSound = null;
 			setMiddlePane(m_sonarGui.root);
 		};
 
 		Game.guiManager.addPanel(new Panel(m_topLevelDiv));
+	}
+
+	private void updateSoundGainsForTactical(bool[] waterfallsTiled)
+	{
+		foreach (i, soundSource; Game.simState.sonarSounds)
+		{
+			if (waterfallsTiled[i])
+			{
+				// set it's gain from respective waterfall's slider
+				soundSource.gain = m_passiveGuis[i].volumeSlider.value;
+			}
+			else
+				soundSource.gain = 0.0f;
+		}
+	}
+
+	// Manager that only lets one panel of each station to be present on the
+	// main tiling UI.
+	private class MainViewTiler: ITilerChoiceProvider
+	{
+		bool[] m_waterfallsTiled;
+		bool m_activeSonarTiled;
+		WaterfallGui[] m_passiveGuis;
+		SonarGui m_sonarGui;
+
+		this(WaterfallGui[] passiveGuis, SonarGui sonarGui)
+		{
+			m_waterfallsTiled = new bool[passiveGuis.length];
+			m_passiveGuis = passiveGuis.dup;
+			m_sonarGui = sonarGui;
+		}
+
+		bool isSplitPossible()
+		{
+			return !m_activeSonarTiled || m_waterfallsTiled.any();
+		}
+
+		void proposeSplittingChoice(int x, int y, void delegate(GuiElement) onSelect)
+		{
+			Button[] splitButtons;
+			if (!m_activeSonarTiled)
+			{
+				splitButtons ~= builder(new Button()).fontSize(15).
+					content("active sonar").build();
+				splitButtons[$-1].onClick += () {
+					m_activeSonarTiled = true;
+					onSelect(m_sonarGui.root);
+				};
+			}
+			foreach (i, wfGui; m_passiveGuis)
+			{
+				if (!m_waterfallsTiled[i])
+				{
+					string hydrophoneName = Game.simState.playerSub.
+						tmpl.hydrophones[i].name;
+					splitButtons ~= builder(new Button()).fontSize(15).
+						content(hydrophoneName ~ " waterfall").build();
+					splitButtons[$-1].onClick +=
+						((j, root) => {
+							m_waterfallsTiled[j] = true;
+							onSelect(root);
+							updateSoundGainsForTactical(m_waterfallsTiled);
+						}) (i, wfGui.root);
+				}
+			}
+			ContextMenu menu = contextMenu(
+					Game.guiManager,
+					splitButtons,
+					Game.window.size,
+					vec2i(x, y),
+					20);
+		}
+
+		void handleChildRemoved(GuiElement child)
+		{
+			if (child is m_sonarGui.root)
+			{
+				m_activeSonarTiled = false;
+				return;
+			}
+			foreach (i, wfGui; m_passiveGuis)
+			{
+				if (wfGui.root is child)
+				{
+					m_waterfallsTiled[i] = false;
+					updateSoundGainsForTactical(m_waterfallsTiled);
+					return;
+				}
+			}
+		}
 	}
 }

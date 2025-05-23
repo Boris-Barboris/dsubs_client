@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -40,6 +40,31 @@ void runModuleTests()
 	testCamera2D();
 }
 
+
+class TilerTestChoice: ITilerChoiceProvider
+{
+	int counter = 0;
+
+	bool isSplitPossible()
+	{
+		return true;
+	}
+
+	void proposeSplittingChoice(int x, int y, void delegate(GuiElement) onSelect)
+	{
+		counter++;
+		Label newChild = builder(new Label()).
+			content("split" ~ counter.to!string).fontSize(16).backgroundVisible(true).
+			backgroundColor(sfColor(150, 150, 150, 255)).fontColor(sfBlack).
+			htextAlign(HTextAlign.CENTER).vtextAlign(VTextAlign.CENTER).
+			fraction(1.0f).build();
+		onSelect(newChild);
+	}
+
+	void handleChildRemoved(GuiElement child) {}
+}
+
+
 void testGuiElements()
 {
 	info("testGuiElements...");
@@ -50,21 +75,25 @@ void testGuiElements()
 	Render render = new Render(wnd, router);
 	render.guiRender = gui;
 
-	Div row1 = builder(hDiv(
+	TilerTestChoice splitterChoice = new TilerTestChoice();
+
+	TilerDiv row1 = builder(hTilerDiv(splitterChoice,
 		[
 			builder(new Label()).content("RED").fontSize(32).backgroundVisible(true).
 				backgroundColor(sfColor(255, 0, 0, 255)).fontColor(sfBlack).
-				htextAlign(HTextAlign.LEFT).vtextAlign(VTextAlign.TOP).build(),
+				htextAlign(HTextAlign.LEFT).vtextAlign(VTextAlign.TOP).
+				fraction(1.0f).build(),
 
 			builder(new Label()).content("GREEN").fontSize(32).backgroundVisible(true).
 				backgroundColor(sfColor(0, 255, 0, 255)).fontColor(sfBlack).
-				htextAlign(HTextAlign.CENTER).vtextAlign(VTextAlign.CENTER).build(),
+				htextAlign(HTextAlign.CENTER).vtextAlign(VTextAlign.CENTER).
+				fraction(0.5f).build(),
 
 			builder(new Label()).content("BLUE").fontSize(32).backgroundVisible(true).
 				backgroundColor(sfColor(0, 0, 255, 255)).fontColor(sfBlack).
 				htextAlign(HTextAlign.RIGHT).vtextAlign(VTextAlign.BOTTOM).build()
 		]
-	)).borderWidth(3).build();
+	)).borderWidth(8).editMode(true).build();
 
 	TextBox collapsableText = builder(new TextBox).content(copypasta).build;
 

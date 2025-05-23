@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -33,3 +33,5 @@ public import dsubs_client.gui.scrollbar;
 public import dsubs_client.gui.slider;
 public import dsubs_client.gui.contextmenu;
 public import dsubs_client.gui.collapsable;
+public import dsubs_client.gui.tiler;
+public import dsubs_client.gui.stack;
