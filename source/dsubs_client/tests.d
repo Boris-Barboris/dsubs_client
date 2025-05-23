@@ -50,7 +50,7 @@ void testGuiElements()
 	Render render = new Render(wnd, router);
 	render.guiRender = gui;
 
-	DragDiv row1 = builder(hDragDiv(
+	TilerDiv row1 = builder(hTilerDiv(null,
 		[
 			builder(new Label()).content("RED").fontSize(32).backgroundVisible(true).
 				backgroundColor(sfColor(255, 0, 0, 255)).fontColor(sfBlack).

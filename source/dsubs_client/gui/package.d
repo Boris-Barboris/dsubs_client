@@ -33,4 +33,4 @@ public import dsubs_client.gui.scrollbar;
 public import dsubs_client.gui.slider;
 public import dsubs_client.gui.contextmenu;
 public import dsubs_client.gui.collapsable;
-public import dsubs_client.gui.dragdiv;
+public import dsubs_client.gui.tiler;

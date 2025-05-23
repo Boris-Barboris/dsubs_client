@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 module dsubs_client.gui.div;
 
 import std.algorithm;
+import std.array: insertInPlace;
 import std.experimental.logger;
 import std.conv: to;
 import std.math;
@@ -28,6 +29,8 @@ public import gfm.math.vector;
 import derelict.sfml2.graphics;
 import derelict.sfml2.system;
 import derelict.sfml2.window;
+
+import dsubs_common.containers.array;
 
 import dsubs_client.lib.sfml;
 import dsubs_client.core.window;
@@ -142,10 +145,37 @@ class Div: GuiElement
 		newChild.parent = this;
 		newChild.parentViewport = &viewport();
 		m_children[idx] = newChild;
+		onChildrenSetChanged();
+		return old;
+	}
+
+	/// add new child, it's new index in the children array will be atIdx
+	void addChild(GuiElement newChild, size_t atIdx)
+	{
+		assert(atIdx <= m_children.length);
+		newChild.parent = this;
+		newChild.parentViewport = &viewport();
+		m_children.insertInPlace(atIdx, newChild);
+		onChildrenSetChanged();
+	}
+
+	GuiElement removeChild(size_t atIdx)
+	{
+		assert(atIdx < m_children.length);
+		GuiElement old = m_children[atIdx];
+		old.parent = null;
+		old.parentViewport = null;
+		old.onHide();
+		m_children = m_children.remove(atIdx);
+		onChildrenSetChanged();
+		return old;
+	}
+
+	protected void onChildrenSetChanged()
+	{
 		if (layoutType == LayoutType.CONTENT)
 			fitContent(fixedAxis, size[odim]);
 		updateChildren();
-		return old;
 	}
 
 	override void childChanged(GuiElement child)
