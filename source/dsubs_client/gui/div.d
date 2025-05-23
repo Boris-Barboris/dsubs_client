@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -54,12 +54,16 @@ class Div: GuiElement
 
 	private
 	{
-		private GuiElement[] m_children;
-		bool m_updatingKids = false;	/// anti-recusrion flag.
 		int m_borderWidth = 0;
-		sfColor m_borderColor = sfTransparent;
 		/// array of rectangles representing external border
 		sfRectangleShape*[4] m_divBorders;
+		GuiElement[] m_children;
+	}
+
+	protected
+	{
+		bool m_updatingKids = false;	/// anti-recusrion flag.
+		sfColor m_borderColor = sfTransparent;
 		/// array of rectangles that are used to draw inter-child borders
 		sfRectangleShape*[] m_cellBorders;
 	}
@@ -119,7 +123,7 @@ class Div: GuiElement
 
 	mixin FinalGetSet!(sfColor, "borderColor", "updateBorderColor();");
 
-	private void updateBorderColor()
+	protected void updateBorderColor()
 	{
 		foreach (r; m_cellBorders)
 			sfRectangleShape_setFillColor(r, m_borderColor);
@@ -236,12 +240,17 @@ class Div: GuiElement
 		return requiredSize;
 	}
 
+	protected int pureChildrenBudget()
+	{
+		return size[dim] - m_borderWidth * (m_children.length.to!int - 1) -
+			2 * externalBorder;
+	}
+
 	// recalculate children layout
-	private void updateChildren()
+	protected void updateChildren()
 	{
 		m_updatingKids = true;
-		int intBudget = size[dim] - m_borderWidth * (m_children.length.to!int - 1) -
-			2 * externalBorder;
+		int intBudget = pureChildrenBudget();
 		float budget = max(0, intBudget);
 		// fixed-sized kids go first
 		int childCount = 0;

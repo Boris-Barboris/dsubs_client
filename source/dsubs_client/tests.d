@@ -50,21 +50,23 @@ void testGuiElements()
 	Render render = new Render(wnd, router);
 	render.guiRender = gui;
 
-	Div row1 = builder(hDiv(
+	DragDiv row1 = builder(hDragDiv(
 		[
 			builder(new Label()).content("RED").fontSize(32).backgroundVisible(true).
 				backgroundColor(sfColor(255, 0, 0, 255)).fontColor(sfBlack).
-				htextAlign(HTextAlign.LEFT).vtextAlign(VTextAlign.TOP).build(),
+				htextAlign(HTextAlign.LEFT).vtextAlign(VTextAlign.TOP).
+				fraction(1.0f).build(),
 
 			builder(new Label()).content("GREEN").fontSize(32).backgroundVisible(true).
 				backgroundColor(sfColor(0, 255, 0, 255)).fontColor(sfBlack).
-				htextAlign(HTextAlign.CENTER).vtextAlign(VTextAlign.CENTER).build(),
+				htextAlign(HTextAlign.CENTER).vtextAlign(VTextAlign.CENTER).
+				fraction(0.5f).build(),
 
 			builder(new Label()).content("BLUE").fontSize(32).backgroundVisible(true).
 				backgroundColor(sfColor(0, 0, 255, 255)).fontColor(sfBlack).
 				htextAlign(HTextAlign.RIGHT).vtextAlign(VTextAlign.BOTTOM).build()
 		]
-	)).borderWidth(3).build();
+	)).borderWidth(8).editMode(true).build();
 
 	TextBox collapsableText = builder(new TextBox).content(copypasta).build;
 
