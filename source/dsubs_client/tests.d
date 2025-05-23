@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -40,6 +40,29 @@ void runModuleTests()
 	testCamera2D();
 }
 
+
+class TilerTestChoice: ITilerChoiceProvider
+{
+	int counter = 0;
+
+	bool isSplitPossible()
+	{
+		return true;
+	}
+
+	void proposeSplittingChoice(int x, int y, void delegate(GuiElement) onSelect)
+	{
+		counter++;
+		Label newChild = builder(new Label()).
+			content("split" ~ counter.to!string).fontSize(16).backgroundVisible(true).
+			backgroundColor(sfColor(150, 150, 150, 255)).fontColor(sfBlack).
+			htextAlign(HTextAlign.CENTER).vtextAlign(VTextAlign.CENTER).
+			fraction(1.0f).build();
+		onSelect(newChild);
+	}
+}
+
+
 void testGuiElements()
 {
 	info("testGuiElements...");
@@ -50,7 +73,9 @@ void testGuiElements()
 	Render render = new Render(wnd, router);
 	render.guiRender = gui;
 
-	TilerDiv row1 = builder(hTilerDiv(null,
+	TilerTestChoice splitterChoice = new TilerTestChoice();
+
+	TilerDiv row1 = builder(hTilerDiv(splitterChoice,
 		[
 			builder(new Label()).content("RED").fontSize(32).backgroundVisible(true).
 				backgroundColor(sfColor(255, 0, 0, 255)).fontColor(sfBlack).

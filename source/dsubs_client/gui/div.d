@@ -134,14 +134,28 @@ class Div: GuiElement
 			sfRectangleShape_setFillColor(r, m_borderColor);
 	}
 
+	private void addNewCellBorder()
+	{
+		sfRectangleShape* brd = sfRectangleShape_create();
+		sfRectangleShape_setOutlineThickness(brd, 0);
+		sfRectangleShape_setFillColor(brd, m_borderColor);
+		m_cellBorders ~= brd;
+	}
+
 	/// set idx child in children array to newChild and return
 	/// the old one.
 	GuiElement setChild(GuiElement newChild, size_t idx)
 	{
-		GuiElement old = m_children[idx];
-		old.parent = null;
-		old.parentViewport = null;
-		old.onHide();
+		GuiElement old;
+		if (idx < m_children.length)
+		{
+			old = m_children[idx];
+			old.parent = null;
+			old.parentViewport = null;
+			old.onHide();
+		}
+		else
+			addNewCellBorder();
 		newChild.parent = this;
 		newChild.parentViewport = &viewport();
 		m_children[idx] = newChild;
@@ -153,6 +167,7 @@ class Div: GuiElement
 	void addChild(GuiElement newChild, size_t atIdx)
 	{
 		assert(atIdx <= m_children.length);
+		addNewCellBorder();
 		newChild.parent = this;
 		newChild.parentViewport = &viewport();
 		m_children.insertInPlace(atIdx, newChild);
@@ -203,7 +218,7 @@ class Div: GuiElement
 	}
 
 	// we don't display external border if our parent is div
-	private @property int externalBorder() const
+	protected final @property int externalBorder() const
 	{
 		if (extBordersHidden)
 			return 0;

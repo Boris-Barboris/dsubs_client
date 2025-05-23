@@ -107,9 +107,6 @@ class TilerDiv: Div
 		onMouseLeave += &handleMouseLeave;
 	}
 
-	mixin FinalGetSet!(sfColor, "splitDirHintColor",
-		"sfRectangleShape_setFillColor(m_splitDirRectangle, rhs);");
-
 	final @property bool editMode() const { return m_editMode; }
 
 	final @property bool editMode(bool rhs)
@@ -151,12 +148,46 @@ class TilerDiv: Div
 
 	private void updateSplitRectangle()
 	{
-		if (m_editMode && m_hoverChildIdx >= 0)	// && m_choiceProvider !is null
+		if (m_editMode && m_choiceProvider !is null && m_hoverChildIdx >= 0)
 		{
 			vec2i hoveredChildSize = children[m_hoverChildIdx].size;
 			vec2i hoveredChildRelPos = children[m_hoverChildIdx].position - this.position;
-			sfRectangleShape_setSize(m_splitDirRectangle, hoveredChildSize.tosf);
-			sfRectangleShape_setPosition(m_splitDirRectangle, hoveredChildRelPos.tosf);
+			final switch (m_hoverChildQuadrant)
+			{
+				case Quadrant.center:
+					sfRectangleShape_setSize(m_splitDirRectangle, hoveredChildSize.tosf);
+					sfRectangleShape_setPosition(m_splitDirRectangle,
+						hoveredChildRelPos.tosf);
+					break;
+				case Quadrant.left:
+					vec2i rectSize = vec2i(hoveredChildSize.x / 2, hoveredChildSize.y);
+					sfRectangleShape_setSize(m_splitDirRectangle, rectSize.tosf);
+					sfRectangleShape_setPosition(m_splitDirRectangle,
+						hoveredChildRelPos.tosf);
+					break;
+				case Quadrant.upper:
+					vec2i rectSize = vec2i(hoveredChildSize.x, hoveredChildSize.y / 2);
+					sfRectangleShape_setSize(m_splitDirRectangle, rectSize.tosf);
+					sfRectangleShape_setPosition(m_splitDirRectangle,
+						hoveredChildRelPos.tosf);
+					break;
+				case Quadrant.right:
+					vec2i rectSize = vec2i(hoveredChildSize.x / 2, hoveredChildSize.y);
+					vec2i rectPos = vec2i(hoveredChildRelPos.x + rectSize.x,
+						hoveredChildRelPos.y);
+					sfRectangleShape_setSize(m_splitDirRectangle, rectSize.tosf);
+					sfRectangleShape_setPosition(m_splitDirRectangle,
+						rectPos.tosf);
+					break;
+				case Quadrant.lower:
+					vec2i rectSize = vec2i(hoveredChildSize.x, hoveredChildSize.y / 2);
+					vec2i rectPos = vec2i(hoveredChildRelPos.x,
+						hoveredChildRelPos.y + rectSize.y);
+					sfRectangleShape_setSize(m_splitDirRectangle, rectSize.tosf);
+					sfRectangleShape_setPosition(m_splitDirRectangle,
+						rectPos.tosf);
+					break;
+			}
 		}
 	}
 
@@ -257,8 +288,11 @@ class TilerDiv: Div
 			}
 			if (oldHoverIdx != m_hoveredBorderIdx)
 				updateBorderColor();
+			if (m_choiceProvider is null)
+				return;
 			// hover over child detection m_hoverChildIdx
 			oldHoverIdx = m_hoverChildIdx;
+			Quadrant oldQuadrant = m_hoverChildQuadrant;
 			m_hoverChildIdx = -1;
 			foreach (i, child; children)
 			{
@@ -269,7 +303,7 @@ class TilerDiv: Div
 					break;
 				}
 			}
-			if (oldHoverIdx != m_hoverChildIdx)
+			if (oldHoverIdx != m_hoverChildIdx || oldQuadrant != m_hoverChildQuadrant)
 				updateSplitRectangle();
 		}
 	}
@@ -291,7 +325,31 @@ class TilerDiv: Div
 		if (child.rectContainsPoint(x, y))
 		{
 			qrant = Quadrant.center;
-			// FIXME
+			vec2f center = child.center;
+			if (x > center.x)
+			{
+				if (fabs(y - center.y) <= (x - center.x))
+					qrant = Quadrant.right;
+				else
+				{
+					if (y > center.y)
+						qrant = Quadrant.lower;
+					else
+						qrant = Quadrant.upper;
+				}
+			}
+			else
+			{
+				if (fabs(y - center.y) <= (center.x - x))
+					qrant = Quadrant.left;
+				else
+				{
+					if (y > center.y)
+						qrant = Quadrant.lower;
+					else
+						qrant = Quadrant.upper;
+				}
+			}
 			return true;
 		}
 		else
@@ -300,10 +358,29 @@ class TilerDiv: Div
 
 	override GuiElement getFromPoint(const sfEvent* evt, int x, int y)
 	{
-		if (!m_editMode)	// m_choiceProvider is null ||
+		if (m_choiceProvider is null || !m_editMode)
 			return super.getFromPoint(evt, x, y);
 		if (this.GuiElement.getFromPoint(evt, x, y))
+		{
+			if (children.length == 0)
+				return this;
+			int offset = dim == 0 ? x - position.x : y - position.y;
+			int cursor = externalBorder;
+			foreach (kid; children)
+			{
+				TilerDiv childTiler = cast(TilerDiv) kid;
+				if (childTiler)
+				{
+					auto check = childTiler.getFromPoint(evt, x, y);
+					if (check)
+						return check;
+				}
+				cursor += kid.size[dim] + borderWidth;
+				if (cursor >= offset)
+					return this;
+			}
 			return this;
+		}
 		else
 			return null;
 	}
@@ -323,6 +400,126 @@ class TilerDiv: Div
 		if (btn != sfMouseLeft)
 			return;
 		dragging = false;
+		if (m_hoverChildIdx != -1 && m_choiceProvider !is null)
+		{
+			// trace("Click on quadrant: ", m_hoverChildQuadrant);
+			if (m_choiceProvider.isSplitPossible())
+			{
+				int childIdx = m_hoverChildIdx;
+				Quadrant qr = m_hoverChildQuadrant;
+				if (qr != Quadrant.center)
+				{
+					m_choiceProvider.proposeSplittingChoice(x, y, (newChild) {
+						this.splitChild(newChild, childIdx, qr);
+					});
+				}
+				else
+					trace("Click on center");
+			}
+			else
+				trace("Split is impossible");
+		}
+	}
+
+	private void splitChild(GuiElement newChild, int childIdx, Quadrant splitDirection)
+	{
+		// trace("childIdx is splitting: ", childIdx, " ", splitDirection);
+		assert(childIdx >= 0 && childIdx < children.length);
+		// TODO actually split the child in the direction of a quadrant
+		if (fixedAxis == Axis.Y)
+		{
+			switch (splitDirection)
+			{
+				case Quadrant.left:
+					// old child moves right
+					splitFractions(newChild, childIdx);
+					addChild(newChild, childIdx);
+					break;
+				case Quadrant.right:
+					// new child moves right
+					splitFractions(newChild, childIdx);
+					addChild(newChild, childIdx + 1);
+					break;
+				case Quadrant.upper:
+					// Tree direction change. Child at childIdx must be replaced
+					// with new TilerDiv.
+					buildOrthogonalCopyAndEmplate(newChild, childIdx, 1);
+					break;
+				case Quadrant.lower:
+					// Tree direction change. Child at childIdx must be replaced
+					// with new TilerDiv.
+					buildOrthogonalCopyAndEmplate(newChild, childIdx, 0);
+					break;
+				default:
+					return;
+			}
+		}
+		else
+		{
+			switch (splitDirection)
+			{
+				case Quadrant.upper:
+					// old child moves right
+					splitFractions(newChild, childIdx);
+					addChild(newChild, childIdx);
+					break;
+				case Quadrant.lower:
+					// new child moves right
+					splitFractions(newChild, childIdx);
+					addChild(newChild, childIdx + 1);
+					break;
+				case Quadrant.left:
+					// Tree direction change. Child at childIdx must be replaced
+					// with new TilerDiv.
+					buildOrthogonalCopyAndEmplate(newChild, childIdx, 1);
+					break;
+				case Quadrant.right:
+					// Tree direction change. Child at childIdx must be replaced
+					// with new TilerDiv.
+					buildOrthogonalCopyAndEmplate(newChild, childIdx, 0);
+					break;
+				default:
+					return;
+			}
+		}
+	}
+
+	// split fractions equally, so that the split will not affect other cells
+	private void splitFractions(GuiElement newChild, int childIdx)
+	{
+		GuiElement oldChild = children[childIdx];
+		float newBorderFractionInOldChild = 0.0f;
+		if (fixedAxis == Axis.Y)
+		{
+			if (borderWidth < oldChild.size.x)
+				newBorderFractionInOldChild = cast(float) borderWidth / oldChild.size.x;
+		}
+		else
+		{
+			if (borderWidth < oldChild.size.y)
+				newBorderFractionInOldChild = cast(float) borderWidth / oldChild.size.y;
+		}
+		newChild.layoutType = LayoutType.FRACT;
+		newChild.fraction = oldChild.fraction * (1.0f - newBorderFractionInOldChild) /
+			2.0f;
+		oldChild.fraction = oldChild.fraction * (1.0f - newBorderFractionInOldChild) /
+			2.0f;
+	}
+
+	private TilerDiv buildOrthogonalCopyAndEmplate(GuiElement newChild,
+		int emplaceChildIdx, size_t addOldChildToCopyAtIdx)
+	{
+		DivType orthType = (fixedAxis == Axis.Y ? DivType.VERT : DivType.HORZ);
+		TilerDiv newTiler = new TilerDiv(orthType, m_choiceProvider, [newChild]);
+		newTiler.borderWidth = borderWidth;
+		newTiler.borderColor = borderColor;
+		newTiler.editMode = editMode;
+
+		GuiElement oldChild = setChild(newTiler, emplaceChildIdx);
+		newTiler.fraction = oldChild.fraction;
+		oldChild.fraction = 1.0f;
+		newTiler.addChild(oldChild, addOldChildToCopyAtIdx);
+		return newTiler;
 	}
 
 	override void handleMouseFocusLoss()
