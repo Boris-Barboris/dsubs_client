@@ -508,6 +508,7 @@ class PanoramicDisplay(DataIntType): GuiElement
 		{
 			int m_mousePrevX, m_mousePrevY;
 			bool m_panned;	/// true when mouse has moved since RMB down
+			int m_panDist = 0;	// allow small jitter for right click
 		}
 
 		private void processMouseDown(int x, int y, sfMouseButton btn)
@@ -524,6 +525,7 @@ class PanoramicDisplay(DataIntType): GuiElement
 			m_panned = false;
 			m_mousePrevX = x;
 			m_mousePrevY = y;
+			m_panDist = 0;
 		}
 
 		private void processMouseUp(int x, int y, sfMouseButton btn)
@@ -543,7 +545,11 @@ class PanoramicDisplay(DataIntType): GuiElement
 		override void onPan(int x, int y)
 		{
 			if (m_mousePrevX != x || m_mousePrevY != y)
+			{
 				m_panned = true;	// we have moved the mouse
+				m_panDist += abs(x - m_mousePrevX);
+				m_panDist += abs(y - m_mousePrevY);
+			}
 			m_camera.pan(
 				vec2d(double(m_mousePrevX - x) / size.x * m_camViewportWidth,
 						double(m_mousePrevY - y) / size.y * m_camViewportHeight)
@@ -740,7 +746,7 @@ final class Waterfall: PanoramicDisplay!ushort
 				Game.ciccon.sendMessage(immutable CICListenDirReq(
 					this.outer.m_hydrophoneIdx, this.outer.m_listenDir));
 			}
-			if (btn == sfMouseRight && !m_panned)
+			if (btn == sfMouseRight && m_panDist < 3)
 				spawnContextMenu(x, y);
 		}
 

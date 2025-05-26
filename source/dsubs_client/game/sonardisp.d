@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -323,7 +323,8 @@ final class SonarDisplay: PanoramicDisplay!ubyte
 
 		private void processMouseUp(int x, int y, sfMouseButton btn)
 		{
-			if (btn == sfMouseRight && !m_panned && this.outer.m_curPingId >= 0)
+			if (btn == sfMouseRight && m_panDist < 3 &&
+				this.outer.m_curPingId >= 0)
 				spawnContextMenu(x, y);
 		}
 
