@@ -407,7 +407,8 @@ final class HydrophoneTrackerElement: OverlayElementWithHover
 		m_label.fontSize = 16;
 		m_label.fontColor = sfWhite;
 		m_label.htextAlign = HTextAlign.CENTER;
-		m_label.size = vec2i(m_label.contentWidth.to!int, m_label.contentHeight.to!int + 4);
+		m_label.size = vec2i(m_label.contentWidth.to!int,
+			m_label.contentHeight.to!int + 3);
 		m_onHoverRect = new RectangleShape(cast(vec2f) m_label.size, sfWhite);
 		size = m_label.size;
 
@@ -429,11 +430,11 @@ final class HydrophoneTrackerElement: OverlayElementWithHover
 	override void onPreDraw()
 	{
 		vec2d screenPos = owner.world2screenPos(vec2d(m_bearing, 0));
-		position = center2lu(screenPos);
+		position = cast (vec2i) vec2d(screenPos.x - size.x / 2, screenPos.y);
 		m_label.position = position;
 		if (m_hovered)
 		{
-			m_onHoverRect.center = cast(vec2f) screenPos;
+			m_onHoverRect.center = cast(vec2f) center;
 		}
 	}
 

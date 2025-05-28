@@ -871,11 +871,13 @@ final class Waterfall: PanoramicDisplay!ushort
 			onMouseUp += &processMouseUp;
 		}
 
+		// always returns 0 for Y axis
 		override vec2d world2screenPos(vec2d world)
 		{
 			return position + vec2d(bearingToPixel(world.x), 0);
 		}
 
+		// always returns 0 for Y axis
 		override vec2d screen2worldPos(vec2d screen)
 		{
 			vec2d local = screen - position;
