@@ -166,7 +166,7 @@ private:
 	{
 		synchronized(Game.mainMutexWriter)
 		{
-			Game.activeState = new DeathScreenState(res);
+			Game.activeState = new DeathScreenState(res, Game.simState.simulatorId);
 		}
 	}
 

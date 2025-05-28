@@ -35,6 +35,7 @@ import dsubs_client.core.settings;
 import dsubs_client.game;
 import dsubs_client.game.gamestate;
 import dsubs_client.game.states.loadout;
+import dsubs_client.game.states.replay;
 import dsubs_client.game.entities;
 import dsubs_client.game.cic.server;
 import dsubs_client.game.cic.messages;
@@ -171,6 +172,7 @@ final class LoginScreenState: GameState
 
 		replayButton.onClick += ()
 		{
+			ReplayState.s_currentSimId = "main_arena";
 			Game.bconm.con.sendMessage(immutable ReplayGetDataReq("main_arena",
 				(cast(Date) Clock.currTime).toISOExtString()));
 		};

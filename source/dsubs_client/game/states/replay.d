@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -59,10 +59,11 @@ final class ReplayState: GameState
 		ContactOverlayShapeCahe m_shapeCache;
 		Slider m_timeSlider;
 		TextField m_simIdBox;
-		__gshared static string s_currentSimId = "main_arena";
 		Label m_curTimeLabel;
 		size_t m_curSlice = 0;
 	}
+
+	__gshared static string s_currentSimId = "main_arena";
 
 	this(Date day, ReplaySlice[] slices)
 	{

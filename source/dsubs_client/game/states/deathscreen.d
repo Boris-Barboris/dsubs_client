@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 module dsubs_client.game.states.deathscreen;
 
+import std.datetime;
 import std.utf;
 
 import core.thread;
@@ -33,6 +34,7 @@ import dsubs_client.game;
 import dsubs_client.game.gamestate;
 import dsubs_client.game.states.loginscreen;
 import dsubs_client.game.states.loadout;
+import dsubs_client.game.states.replay;
 import dsubs_client.game.cic.server;
 import dsubs_client.game.cic.messages;
 import dsubs_client.gui;
@@ -54,15 +56,18 @@ final class DeathScreenState: GameState
 	{
 		bool m_simTerminated;
 		CICSimFlowEndRes m_deathRes;
+		string m_simulatorId;
 	}
 
-	this(CICSimFlowEndRes deathRes)
+	this(CICSimFlowEndRes deathRes, string simulatorId)
 	{
+		m_simulatorId = simulatorId;
 		m_deathRes = deathRes;
 	}
 
-	this()
+	this(string simulatorId)
 	{
+		m_simulatorId = simulatorId;
 		m_simTerminated = true;
 	}
 
@@ -123,6 +128,17 @@ final class DeathScreenState: GameState
 		Div textDiv = builder(vDiv([filler(0.25f), youDiedLabel, causeLabel,
 			longReportScroll, goToMainMenu, filler(0.25f)])).borderWidth(20).
 			fixedSize(vec2i(800, 450)).build();
+		if (!isCicClient && m_simulatorId)
+		{
+			Button watchReplayBtn = builder(new Button()).content("watch replay").
+				htextAlign(HTextAlign.CENTER).fontSize(BUTTON_FONTSIZE).build();
+			watchReplayBtn.onClick += () {
+				ReplayState.s_currentSimId = m_simulatorId;
+				Game.bconm.con.sendMessage(immutable ReplayGetDataReq(m_simulatorId,
+					(cast(Date) Clock.currTime).toISOExtString()));
+			};
+			textDiv.setChild(watchReplayBtn, 5);
+		}
 		Div screenLayout = hDiv([
 			filler(),
 			textDiv,

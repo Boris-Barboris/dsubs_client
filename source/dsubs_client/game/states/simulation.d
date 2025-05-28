@@ -81,6 +81,8 @@ final class SimulatorState: GameState
 		return m_recState.rawState.timeAccelerationFactor;
 	}
 
+	@property string simulatorId() const { return m_recState.rawState.simulatorId; }
+
 	private
 	{
 		WireGuidedWeaponIcon[string] m_wireGuidedIcons;
@@ -245,7 +247,7 @@ final class SimulatorState: GameState
 	override void handleSimulatorTerminatingRes()
 	{
 		error("SimulatorTerminatingRes received, jumping to death screen");
-		Game.activeState = new DeathScreenState();
+		Game.activeState = new DeathScreenState(Game.simState.simulatorId);
 	}
 
 	void requestTimeAccelerationFactor(short requestedFactor)
