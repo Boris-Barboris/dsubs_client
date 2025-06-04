@@ -206,6 +206,7 @@ __gshared:
 	/// game state.
 	private static void clearEntities()
 	{
+		scheduler.clear();
 		cleanupSoundResources();
 		inputRouter.clearFocused();
 		guiManager.clearPanels();

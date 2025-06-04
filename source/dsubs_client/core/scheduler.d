@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -75,6 +75,15 @@ final class Scheduler
 		trace("OK");
 	}
 
+	void clear()
+	{
+		synchronized (m_recordsLock)
+		{
+			m_addQueue.length = 0;
+			m_records.clear();
+		}
+	}
+
 	/// execute delegate 'what' after 'after' time interval, while holding
 	/// 'mutToHold' lock.
 	void delay(void delegate() what, Duration after, Object.Monitor mutToHold = null)
@@ -99,18 +108,27 @@ final class Scheduler
 			if (tillWakeup == Duration.zero)
 			{
 				synchronized(m_cond.mutex)
-					m_cond.wait();
+				{
+					if (m_addQueue.length == 0)
+						m_cond.wait();
+				}
 			}
 			else
 				if (tillWakeup > Duration.zero)
 				{
 					synchronized(m_cond.mutex)
-						frontReached = !m_cond.wait(tillWakeup);
+					{
+						if (m_addQueue.length == 0)
+							frontReached = !m_cond.wait(tillWakeup);
+					}
 				}
 				else
 					frontReached = true;
 			if (atomicLoad(m_stop))
+			{
+				trace("Scheduler thread exiting...");
 				break;
+			}
 			synchronized (m_recordsLock)
 			{
 				foreach (rec; m_addQueue)
@@ -125,10 +143,11 @@ final class Scheduler
 			if (frontReached)
 			{
 				DelayRecord firstRecord = m_records.front;
-				// actually run the code
 				{
 					if (firstRecord.lockToHold)
+					{
 						firstRecord.lockToHold.lock();
+					}
 					scope(exit)
 					{
 						if (firstRecord.lockToHold)
@@ -144,7 +163,11 @@ final class Scheduler
 						exit(1);
 					}
 				}
-				m_records.removeFront();
+				synchronized (m_recordsLock)
+				{
+					if (!m_records.empty)
+						m_records.removeFront();
+				}
 			}
 			// setup next wakeup
 			if (m_records.empty)

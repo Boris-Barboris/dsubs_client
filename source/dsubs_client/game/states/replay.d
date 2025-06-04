@@ -45,6 +45,7 @@ private
 {
 	enum int BTN_FONT = 25;
 	enum int SIM_ID_FONT = 16;
+	enum Duration PLAYING_TICK = msecs(150);
 }
 
 
@@ -61,6 +62,8 @@ final class ReplayState: GameState
 		TextField m_simIdBox;
 		Label m_curTimeLabel;
 		size_t m_curSlice = 0;
+		MonoTime m_lastUpdateTime;
+		bool m_playing;
 	}
 
 	__gshared static string s_currentSimId = "main_arena";
@@ -70,6 +73,29 @@ final class ReplayState: GameState
 		m_day = day;
 		m_slices = slices;
 		m_shapeCache = new ContactOverlayShapeCahe();
+	}
+
+	@property bool playing() const { return m_playing; }
+
+	@property void playing(bool rhs)
+	{
+		m_playing = rhs;
+	}
+
+	private void onPlayingTick()
+	{
+		if (m_playing && m_slices.length && (m_curSlice < m_slices.length - 1))
+		{
+			m_timeSlider.value =
+				fmax(0.0f, fmin(1.0f,
+					m_timeSlider.value + m_timeSlider.wheelGain));
+		}
+		if ((cast(ReplayState) Game.activeState) is this)
+		{
+			// re-schedule the tick if we're still in replay
+			Game.delay({ this.onPlayingTick(); },
+				PLAYING_TICK, Game.mainMutexWriter);
+		}
 	}
 
 	override void setup()
@@ -112,6 +138,9 @@ final class ReplayState: GameState
 				m_curTimeLabel.content = SysTime.fromUnixTime(m_slices[m_curSlice].unixTime, UTC()).to!string;
 			}
 		};
+		m_timeSlider.onMouseDown += (x, y, btn) {
+			this.playing = false;
+		};
 
 		void delegate(long, Modifier) hotkeyHandler =
 			(long usecsDelta, Modifier curMods) {
@@ -131,6 +160,9 @@ final class ReplayState: GameState
 				}
 			};
 		Game.hotkeyManager.addHoldkey(hotkeyHandler);
+		Game.hotkeyManager.setHotkey(Hotkey(sfKeySpace), {
+			playing = !playing;
+		});
 
 		TextField dateField = builder(new TextField()).content(
 			m_day.toISOExtString()).symbolFilter(&numericSymbFilter).
@@ -165,7 +197,13 @@ final class ReplayState: GameState
 			m_timeSlider]);
 		Game.guiManager.addPanel(new Panel(mainDiv));
 		if (m_slices)
+		{
 			m_overlay.rebuildFromSlice(m_slices[0]);
+			playing = true;
+			Game.delay({ this.onPlayingTick(); },
+				PLAYING_TICK, Game.mainMutexWriter);
+			// 7a4f4f80-159e-4f34-a496-f842bca85320
+		}
 	}
 
 	override void handleBackendDisconnect()
