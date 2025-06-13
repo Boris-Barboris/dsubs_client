@@ -120,6 +120,7 @@ struct KinematicTrace
 	{
 		double dt = (records[i2].atTime - records[i1].atTime) / 1e6;
 		double t = (curTime - records[i1].atTime) / 1e6 / dt;
+		t = clamp(t, 0.0, 1.0);
 
 		curState.position = chspline(records[i1].position, records[i2].position,
 			records[i1].velocity, records[i2].velocity, t, dt);
