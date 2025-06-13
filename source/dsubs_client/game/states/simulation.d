@@ -921,7 +921,7 @@ final class SimulationGUI
 
 		bool isSplitPossible()
 		{
-			return !m_activeSonarTiled || m_waterfallsTiled.any();
+			return !m_activeSonarTiled || !m_waterfallsTiled.all();
 		}
 
 		void proposeSplittingChoice(int x, int y, void delegate(GuiElement) onSelect)
@@ -931,7 +931,7 @@ final class SimulationGUI
 			{
 				splitButtons ~= builder(new Button()).fontSize(15).
 					content("active sonar").build();
-				splitButtons[$-1].onClick += () {
+				splitButtons[0].onClick += () {
 					m_activeSonarTiled = true;
 					onSelect(m_sonarGui.root);
 				};
