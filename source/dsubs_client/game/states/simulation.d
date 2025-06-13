@@ -551,7 +551,7 @@ final class SimulationGUI
 		}
 
 		size_t tabFirstHtIdx = canAbandon ? 1 : 0;
-		foreach (i, btn; tabs[tabFirstHtIdx .. $])
+		foreach (i, btn; tabs[tabFirstHtIdx .. $ - 2])
 		{
 			Game.hotkeyManager.setHotkey(Hotkey(tabIdxToHotkeyKey[i]),
 				((btn) => { btn.simulateClick(); }) (btn));
