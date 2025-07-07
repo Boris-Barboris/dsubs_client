@@ -35,15 +35,11 @@ import dsubs_common.api.messages;
 import dsubs_client.core.utils;
 import dsubs_client.common;
 import dsubs_client.game;
-import dsubs_client.game.entities;
 import dsubs_client.game.gamestate;
 import dsubs_client.game.states.loginscreen;
 import dsubs_client.game.states.loadout;
-import dsubs_client.game.states.simulation;
-import dsubs_client.game.cic.server;
+import dsubs_client.game.states.simobserver;
 import dsubs_client.gui;
-import dsubs_client.input.router: IInputReceiver;
-import dsubs_client.input.hotkeymanager;
 
 
 private
@@ -67,6 +63,7 @@ final class DevMenuState: GameState
 		Div m_footerDiv;
 		ScrollBar m_simListScrollBar;
 		Panel m_mainPanel;
+		Button m_observeButtonToSignalClickEnd;
 	}
 
 	this(SimulatorRecord[] simulators)
@@ -84,7 +81,11 @@ final class DevMenuState: GameState
 
 	void handleDevObserveSimulatorRes(DevObserveSimulatorRes res)
 	{
-		// TODO
+		if (m_observeButtonToSignalClickEnd)
+			m_observeButtonToSignalClickEnd.signalClickEnd();
+		if (!res.success)
+			return;
+		Game.activeState = new SimObserverState(res);
 	}
 
 	private Div buildObservableSimRow(SimulatorRecord simRec)
@@ -100,7 +101,8 @@ final class DevMenuState: GameState
 		observeSimBtn.onClick += ()
 			{
 				info("Requesting observation of simulator ", simRec.uniqId);
-				observeSimBtn.signalClickEnd();
+				m_observeButtonToSignalClickEnd = observeSimBtn;
+				Game.bconm.con.sendMessage(immutable DevObserveSimulatorReq(simRec.uniqId));
 			};
 
 		return res;
