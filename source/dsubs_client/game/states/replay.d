@@ -301,23 +301,12 @@ final class ReplayOverlayEl: OverlayElement
 }
 
 
-final class ReplayOverlay: Overlay
+final class ReplayOverlay: WorldSpaceOverlay
 {
-	private
-	{
-		CameraController m_camCtrl;
-		int m_mousePrevX, m_mousePrevY;
-	}
 
 	this(CameraController camCtrl)
 	{
-		m_camCtrl = camCtrl;
-		mouseTransparent = false;
-		// mouse and keyboard handlers
-		onMouseDown += &processMouseDown;
-		onMouseUp += &processMouseUp;
-		onMouseMove += &processMouseMove;
-		onMouseScroll += &processMouseScroll;
+		super(camCtrl);
 	}
 
 	void rebuildFromSlice(ReplaySlice slice)
@@ -325,74 +314,5 @@ final class ReplayOverlay: Overlay
 		this.clear();
 		foreach (ReplayObjectRecord record; slice.objects)
 			this.add(new ReplayOverlayEl(this, record));
-	}
-
-	private void processMouseDown(int x, int y, sfMouseButton btn)
-	{
-		if (btn == sfMouseRight)
-		{
-			onPanStart(x, y);
-			requestMouseFocus();
-		}
-	}
-
-	private void processMouseUp(int x, int y, sfMouseButton btn)
-	{
-		if (btn == sfMouseRight)
-			returnMouseFocus();
-	}
-
-	override void onPanStart(int x, int y)
-	{
-		m_mousePrevX = x;
-		m_mousePrevY = y;
-	}
-
-	private void processMouseMove(int x, int y)
-	{
-		if (mouseFocused)
-			onPan(x, y);
-	}
-
-	override void onPan(int x, int y)
-	{
-		m_camCtrl.onPan(x - m_mousePrevX, y - m_mousePrevY);
-		m_mousePrevX = x;
-		m_mousePrevY = y;
-	}
-
-	private void processMouseScroll(int x, int y, float delta)
-	{
-		m_camCtrl.onScroll(x, y, delta);
-	}
-
-	override vec2d world2screenPos(vec2d world)
-	{
-		return m_camCtrl.camera.transform2screen(world);
-	}
-
-	override double world2screenRot(double world)
-	{
-		return world - m_camCtrl.camera.rotation;
-	}
-
-	override vec2d screen2worldPos(vec2d screen)
-	{
-		return m_camCtrl.camera.transform2world(screen);
-	}
-
-	override double screen2worldRot(double screen)
-	{
-		return screen + m_camCtrl.camera.rotation;
-	}
-
-	override double world2screenLength(double world)
-	{
-		return world * m_camCtrl.camera.zoom;
-	}
-
-	override double screen2worldLength(double screen)
-	{
-		return screen / m_camCtrl.camera.zoom;
 	}
 }

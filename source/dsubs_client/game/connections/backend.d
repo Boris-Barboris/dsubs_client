@@ -33,6 +33,7 @@ import dsubs_common.network.connection;
 import dsubs_client.common;
 import dsubs_client.game;
 import dsubs_client.game.gamestate: GameState;
+import dsubs_client.game.states.devmenu: DevMenuState;
 import dsubs_client.game.states.loadout: LoadoutState;
 import dsubs_client.game.states.loginscreen: LoginScreenState;
 import dsubs_client.game.states.replay: ReplayState;
@@ -160,6 +161,34 @@ private:
 			// eager CIC destruction to evict clients
 			if (Game.cic)
 				Game.cic.stop();
+		}
+	}
+
+	//
+	// developer mode messages
+	//
+
+	void h_devSimulatorsListRes(DevSimulatorsListRes res)
+	{
+		synchronized(Game.mainMutexWriter)
+		{
+			Game.activeState = new DevMenuState(res.simulators);
+		}
+	}
+
+	void h_devObserveSimulatorRes(DevObserveSimulatorRes res)
+	{
+		synchronized(Game.mainMutexWriter)
+		{
+			Game.devMenuState.handleDevObserveSimulatorRes(res);
+		}
+	}
+
+	void h_devObserverSimulatorUpdateRes(DevObserverSimulatorUpdateRes res)
+	{
+		synchronized(Game.mainMutexWriter)
+		{
+			Game.simObserverState.handleDevObserverSimulatorUpdateRes(res);
 		}
 	}
 }

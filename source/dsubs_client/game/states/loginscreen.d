@@ -299,6 +299,9 @@ final class LoginScreenState: GameState
 		canLogin = false;
 		m_scenariosReceived = false;
 		Game.entityDbHash = res.dbHash;
+		Game.developerMode = res.developerMode;
+		if (res.developerMode)
+			info("Developer mode authorized by the backend");
 		infoLabel.content = "Requesting entity database";
 		Game.bconm.con.sendMessage(immutable EntityDbReq());
 		// connect secondary audio socket

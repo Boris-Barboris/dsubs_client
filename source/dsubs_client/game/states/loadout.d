@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -62,6 +62,7 @@ private
 
 
 /// Scenario and loadout selection.
+/// TODO: split loadout off
 final class LoadoutState: GameState
 {
 	private
@@ -612,6 +613,19 @@ final class LoadoutState: GameState
 
 		m_footerDiv = builder(hDiv([filler(), filler(), filler()])).
 			fixedSize(vec2i(1, HDR_SIZE)).build();
+
+		if (Game.developerMode)
+		{
+			// build switch to developer menu button
+			Button toDevMenuBtn = builder(new Button(ButtonType.ASYNC)).
+				fontSize(HDR_FONT).
+				htextAlign(HTextAlign.CENTER).content("Developer menu").fixedSize(vec2i(250, HDR_SIZE)).build();
+			toDevMenuBtn.onClick += {
+				trace("requesting simulator list");
+				Game.bconm.con.sendMessage(immutable DevSimulatorsListReq());
+			};
+			m_footerDiv.setChild(toDevMenuBtn, 1);
+		}
 
 		availableScenarios = new AvailableScenariosRes();
 		*availableScenarios = res;
