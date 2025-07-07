@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -41,10 +41,12 @@ import dsubs_client.game.gamestate;
 import dsubs_client.game.connections.backend;
 import dsubs_client.game.entities;
 import dsubs_client.game.cic.server;
+import dsubs_client.game.states.devmenu;
 import dsubs_client.game.states.loginscreen;
 import dsubs_client.game.states.loadout;
 import dsubs_client.game.states.replay;
 import dsubs_client.game.states.simulation;
+import dsubs_client.game.states.simobserver;
 
 
 /// Namespace for globals wich represent the game state.
@@ -71,6 +73,9 @@ __gshared:
 	immutable(ubyte)[] entityDbHash;
 	EntityDb entityDb;
 	EntityManager entityManager;
+
+	// logged-in user context. TODO: maybe group in a class/struct?
+	bool developerMode;
 
 	/// persistent backend connection
 	BackendConMaintainer bconm;
@@ -119,6 +124,23 @@ __gshared:
 		SimulatorState resState = cast(SimulatorState) m_activeState;
 		enforce(resState !is null,
 			"game is not in simulator state, but in " ~ m_activeState.classinfo.name);
+		return resState;
+	}
+
+	static @property DevMenuState devMenuState()
+	{
+		DevMenuState resState = cast(DevMenuState) m_activeState;
+		enforce(resState !is null,
+			"game is not in DevMenu state, but in " ~ m_activeState.classinfo.name);
+		return resState;
+	}
+
+	static @property SimObserverState simObserverState()
+	{
+		SimObserverState resState = cast(SimObserverState) m_activeState;
+		enforce(resState !is null,
+			"game is not in SimObserver state, but in " ~
+				m_activeState.classinfo.name);
 		return resState;
 	}
 
