@@ -307,12 +307,24 @@ final class ReplayOverlay: WorldSpaceOverlay
 	this(CameraController camCtrl)
 	{
 		super(camCtrl);
+		m_mapGrid = new MapGrid(COLORS.mapGrid, 1.0f);
 	}
+
+	private MapGrid m_mapGrid;
 
 	void rebuildFromSlice(ReplaySlice slice)
 	{
 		this.clear();
 		foreach (ReplayObjectRecord record; slice.objects)
 			this.add(new ReplayOverlayEl(this, record));
+	}
+
+	override void draw(Window wnd, long usecsDelta)
+	{
+		if (hidden)
+			return;
+		super.draw(wnd, usecsDelta);
+		m_mapGrid.rebuild(this);
+		m_mapGrid.draw(wnd);
 	}
 }
