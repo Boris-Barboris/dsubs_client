@@ -460,7 +460,7 @@ final class SimulationGUI
 		m_divWithLeftPad.setChild(goalListDiv, 1);
 	}
 
-	private static string pauseBtnContent(bool isPaused)
+	static string pauseBtnContent(bool isPaused)
 	{
 		// these are supported by LiberationMono-Regular.ttf
 		if (isPaused)
@@ -469,7 +469,7 @@ final class SimulationGUI
 			return "\u05f0";
 	}
 
-	private static string timeAccelBtnContent(short factor)
+	static string timeAccelBtnContent(short factor)
 	{
 		return format("x%g", factor / 10.0f);
 	}
