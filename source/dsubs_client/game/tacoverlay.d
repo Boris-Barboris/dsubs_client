@@ -88,6 +88,26 @@ final class ContactOverlayShapeCahe
 		m_rayChainLine = new LineShape(vec2d(0, 0), vec2d(0, 0),
 			sfColor(255, 0, 0, 150), 1.0);
 		m_wireGuidedIcon = new CircleShape(5.0f, 3, COLORS.basePlayerColor, 2);
+
+		// developer mode observer shapes
+		m_soundSourceShape = new CircleShape(12, 20, sfColor(150, 150, 150, 100), 0);
+		m_soundSourceShape.fillColor = m_soundSourceShape.borderColor;
+
+		// m_hydrophoneShape = new ShapeComposite([
+		// 	new CircleShape(10, 20, sfWhite, 3.0f),
+		// 	new RectangleShape(vec2f(20, 20), sfWhite, sfTransparent, 2.0f)
+		// ]);
+		m_hydrophoneShape = new CircleShape(7.0f, 20, sfColor(255, 255, 255, 180), 2.0f);
+
+		// m_activeSonarShape = new ShapeComposite([
+		// 	new CircleShape(10, 20, sfWhite, 3.0f),
+		// 	new LineShape(vec2d(-10.0f, 10.0f), vec2d(10.0f, 10.0f), sfWhite, 2.0f),
+		// 	new LineShape(vec2d(0.0f, 0.0f), vec2d(0.0f, 20.0f), sfWhite, 2.0f)
+		// ]);
+		m_activeSonarShape = new CircleShape(7.0f, 5, sfColor(240, 34, 102, 180), 2.0f);
+
+		m_pingShape = new CircleShape(20, 12, sfColor(200, 0, 0, 150), 0);
+		m_pingShape.fillColor = m_pingShape.borderColor;
 	}
 
 	private
@@ -110,6 +130,12 @@ final class ContactOverlayShapeCahe
 	mixin Readonly!(LineShape, "rayChainLine");
 	mixin Readonly!(LineShape, "shortestToSolution");
 	mixin Readonly!(CircleShape, "wireGuidedIcon");
+
+	// developer mode observer shapes
+	mixin Readonly!(CircleShape, "soundSourceShape");
+	mixin Readonly!(CircleShape, "hydrophoneShape");
+	mixin Readonly!(CircleShape, "activeSonarShape");
+	mixin Readonly!(CircleShape, "pingShape");
 
 	// https://stackoverflow.com/a/8509802/3084875
 	static sfColor rotateColor(sfColor color, float hue)

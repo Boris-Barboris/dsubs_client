@@ -386,6 +386,17 @@ final class SimObserverEl: OverlayElement
 				m_shape = Game.simObserverState.m_shapeCache.forContactTypeNew(
 					ContactType.environment);
 				break;
+			case "Hydrophone":
+				m_shape = Game.simObserverState.m_shapeCache.hydrophoneShape;
+				break;
+			case "SoundSource":
+			case "PropellerSound":
+			case "PrerecordedSoundSource":
+				m_shape = Game.simObserverState.m_shapeCache.soundSourceShape;
+				break;
+			case "SonarPing":
+				m_shape = Game.simObserverState.m_shapeCache.pingShape;
+				break;
 			default:
 				m_shape = Game.simObserverState.m_shapeCache.forContactTypeNew(
 					ContactType.unknown);
@@ -408,7 +419,10 @@ final class SimObserverEl: OverlayElement
 		else if (m_jsonState && "name" in *m_jsonState)
 			m_nameLabel.content = (*m_jsonState)["name"].str;
 		else
-			m_nameLabel.content = m_record.id;
+		{
+			m_nameLabel.content = m_record.id[0..6];
+			m_nameLabel.fontColor = sfColor(200, 200, 200, 30);
+		}
 		m_nameLabel.size = cast(vec2i) vec2f(m_nameLabel.contentWidth + 10,
 				m_nameLabel.contentHeight + 2);
 		size = cast(vec2i) vec2f(2 * m_shape.radius + 8, 2 * m_shape.radius + 8);
@@ -427,8 +441,13 @@ final class SimObserverEl: OverlayElement
 	void updateFromRecord()
 	{
 		assert(m_jsonState);
+		if ("dead" !in *m_jsonState)
+			return;
 		if ((*m_jsonState)["dead"].boolean)
+		{
 			m_shape.borderColor = sfColor(100, 100, 100, 255);
+			m_velLine.color = sfColor(100, 100, 100, 255);
+		}
 	}
 
 	override void onPreDraw()
