@@ -38,6 +38,7 @@ import dsubs_client.game.cic.messages;
 import dsubs_client.game.gamestate;
 import dsubs_client.game.tacoverlay;
 import dsubs_client.game.states.loginscreen;
+import dsubs_client.game.states.simulation: SimulationGUI;
 import dsubs_client.gui;
 
 
@@ -46,6 +47,8 @@ private
 	enum int HEADER_FONT = 22;
 	enum int SIMID_FONT = 12;
 	enum int EL_DATA_FONT = 12;
+	enum int BTN_FONT = 20;
+	enum int BIG_BTN_FONT = 24;
 }
 
 
@@ -204,8 +207,11 @@ final class ObserverGui
 		Button m_abandonBtn;
 		Div m_mainDiv;
 		Div m_headerDiv;
+		Div m_footerDiv;
 		Div m_middleScreenDiv;
 		TextBox m_selectedElementText;
+		Button m_pauseBtn;
+		Button m_timeAccelBtn;
 	}
 
 	this(string simulatorId, SimObserverOverlay overlay)
@@ -231,21 +237,112 @@ final class ObserverGui
 		};
 
 		m_headerDiv = builder(hDiv([m_abandonBtn, simIdLabel, filler()])).fixedSize(
-				vec2i(10, HEADER_FONT + 5)).backgroundColor(COLORS.simPanelBgnd).build;
+			vec2i(10, HEADER_FONT + 5)).backgroundColor(COLORS.simPanelBgnd).build;
 
 		// selected element description
-		m_selectedElementText = builder(new TextBox()).
-			backgroundColor(COLORS.simPanelBgnd).fontSize(EL_DATA_FONT).build;
-		ScrollBar selectedElScrollBar = builder(new ScrollBar(m_selectedElementText)).build;
+		m_selectedElementText = builder(new TextBox()).fontSize(EL_DATA_FONT).build;
+		ScrollBar selectedElScrollBar = builder(new ScrollBar(m_selectedElementText)).
+			backgroundColor(COLORS.simPanelBgnd).build;
 		m_middleScreenDiv = builder(hDiv([filler(0.77f), selectedElScrollBar])).build;
 
-		// Stack tacticalScreenStack = builder(new Stack([
-		// 	overlay, m_middleScreenDiv])).fraction(1000.0f).build();
+		// footer stuff
+
+		bool pausedNow = false;
+		m_pauseBtn = builder(new Button()).
+			fontName("SansMono").
+			content(SimulationGUI.pauseBtnContent(pausedNow)).fontSize(BIG_BTN_FONT).
+			fixedSize(vec2i(BIG_BTN_FONT + 4, BIG_BTN_FONT)).build;
+		m_pauseBtn.onClick += () {
+			Game.bconm.con.sendMessage(immutable PauseSimulatorReq(!pausedNow));
+			pausedNow = !pausedNow;
+			m_pauseBtn.content = SimulationGUI.pauseBtnContent(pausedNow);
+		};
+
+		short currentAccel = 10;
+		m_timeAccelBtn = builder(new Button()).
+			content(SimulationGUI.timeAccelBtnContent(currentAccel)).fontSize(BTN_FONT).
+			fixedSize(vec2i(BTN_FONT + 20, BIG_BTN_FONT)).build;
+		m_timeAccelBtn.onClick += () {
+			ContextMenu menu = contextMenu(
+				Game.guiManager,
+				buildTimeAccelButtons(),
+				Game.window.size,
+				vec2i(m_timeAccelBtn.position.x, m_timeAccelBtn.position.y),
+				20);
+		};
+
+		m_footerDiv = builder(hDiv([filler(), m_pauseBtn, m_timeAccelBtn])).fixedSize(
+			vec2i(10, HEADER_FONT + 5)).backgroundColor(COLORS.simPanelBgnd).build;
 
 		m_mainDiv = vDiv([
 			m_headerDiv,
-			m_middleScreenDiv]);
+			m_middleScreenDiv,
+			m_footerDiv]);
 		Game.guiManager.addPanel(new Panel(m_mainDiv));
+	}
+
+	private Button[] buildTimeAccelButtons()
+	{
+		Button[] timeAccelerationButtons;
+
+		timeAccelerationButtons ~= builder(new Button()).fontSize(15).
+			content("x1 normal").build();
+		timeAccelerationButtons[$-1].onClick += () {
+			requestTimeAccelerationFactor(10);
+		};
+		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum1), ()
+		{
+			requestTimeAccelerationFactor(10);
+		});
+
+		timeAccelerationButtons ~= builder(new Button()).fontSize(15).
+			content("x2 speed").build();
+		timeAccelerationButtons[$-1].onClick += () {
+			requestTimeAccelerationFactor(20);
+		};
+		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum2), ()
+		{
+			requestTimeAccelerationFactor(20);
+		});
+
+		timeAccelerationButtons ~= builder(new Button()).fontSize(15).
+			content("x4 speed").build();
+		timeAccelerationButtons[$-1].onClick += () {
+			requestTimeAccelerationFactor(40);
+		};
+		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum3), ()
+		{
+			requestTimeAccelerationFactor(40);
+		});
+
+		timeAccelerationButtons ~= builder(new Button()).fontSize(15).
+			content("x8 speed").build();
+		timeAccelerationButtons[$-1].onClick += () {
+			requestTimeAccelerationFactor(80);
+		};
+		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum4), ()
+		{
+			requestTimeAccelerationFactor(80);
+		});
+
+		timeAccelerationButtons ~= builder(new Button()).fontSize(15).
+			content("x0.5 half").build();
+		timeAccelerationButtons[$-1].onClick += () {
+			requestTimeAccelerationFactor(5);
+		};
+		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum5), ()
+		{
+			requestTimeAccelerationFactor(5);
+		});
+
+		return timeAccelerationButtons;
+	}
+
+	private void requestTimeAccelerationFactor(short requestedFactor)
+	{
+		Game.bconm.con.sendMessage(
+			immutable TimeAccelerationReq(requestedFactor));
+		m_timeAccelBtn.content = SimulationGUI.timeAccelBtnContent(requestedFactor);
 	}
 }
 
@@ -285,6 +382,10 @@ final class SimObserverEl: OverlayElement
 				m_shape = Game.simObserverState.m_shapeCache.forContactTypeNew(
 					ContactType.decoy);
 				break;
+			case "Animal":
+				m_shape = Game.simObserverState.m_shapeCache.forContactTypeNew(
+					ContactType.environment);
+				break;
 			default:
 				m_shape = Game.simObserverState.m_shapeCache.forContactTypeNew(
 					ContactType.unknown);
@@ -304,6 +405,8 @@ final class SimObserverEl: OverlayElement
 				m_prototypeLabel.contentHeight + 2);
 		if (m_jsonState && "captain" in *m_jsonState)
 			m_nameLabel.content = (*m_jsonState)["captain"].str;
+		else if (m_jsonState && "name" in *m_jsonState)
+			m_nameLabel.content = (*m_jsonState)["name"].str;
 		else
 			m_nameLabel.content = m_record.id;
 		m_nameLabel.size = cast(vec2i) vec2f(m_nameLabel.contentWidth + 10,
@@ -379,5 +482,17 @@ final class SimObserverOverlay: WorldSpaceOverlay
 	{
 		super(camCtrl);
 		mouseTransparent = false;
+		m_mapGrid = new MapGrid(COLORS.mapGrid, 1.0f);
+	}
+
+	private MapGrid m_mapGrid;
+
+	override void draw(Window wnd, long usecsDelta)
+	{
+		if (hidden)
+			return;
+		super.draw(wnd, usecsDelta);
+		m_mapGrid.rebuild(this);
+		m_mapGrid.draw(wnd);
 	}
 }
