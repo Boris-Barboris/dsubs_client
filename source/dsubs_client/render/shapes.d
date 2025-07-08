@@ -1,6 +1,6 @@
 /*
 DSubs
-Copyright (C) 2017-2021 Baranin Alexander
+Copyright (C) 2017-2025 Baranin Alexander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -41,6 +41,37 @@ abstract class Shape
 	void render(Window wnd, const mat3x3d trans);
 	void render(Window wnd, const sfTransform trans);
 }
+
+
+/// Unordered composite of other shapes
+final class ShapeComposite: Shape
+{
+	private Shape[] m_shapes;
+
+	this(Shape[] shapes)
+	{
+		m_shapes = shapes;
+	}
+
+	override void render(Window wnd)
+	{
+		foreach (shape; m_shapes)
+			shape.render(wnd);
+	}
+
+	override void render(Window wnd, const mat3x3d trans)
+	{
+		foreach (shape; m_shapes)
+			shape.render(wnd, trans);
+	}
+
+	override void render(Window wnd, const sfTransform trans)
+	{
+		foreach (shape; m_shapes)
+			shape.render(wnd, trans);
+	}
+}
+
 
 /// Convex polygon shape, backed by SFML ConvexShape. Vertices are immutable.
 final class ConvexShape: Shape
