@@ -43,8 +43,9 @@ import dsubs_client.gui;
 
 private
 {
-	enum int BTN_FONT = 22;
+	enum int HEADER_FONT = 22;
 	enum int SIMID_FONT = 12;
+	enum int EL_DATA_FONT = 12;
 }
 
 
@@ -58,7 +59,7 @@ private struct EntityElementPair
 
 
 /// Observe and manipulate some running simulator
-class SimObserverState: GameState
+final class SimObserverState: GameState
 {
 	private
 	{
@@ -68,6 +69,33 @@ class SimObserverState: GameState
 		EntityElementPair*[string] m_existingEntities;
 		ContactOverlayShapeCahe m_shapeCache;
 		DevObserveSimulatorRes m_firstFullUpdate;
+		ObserverGui m_observerGui;
+		string m_selectedElementId;
+	}
+
+	@property ObserverGui gui() { return m_observerGui; }
+
+	@property string selectedElementId() const { return m_selectedElementId; }
+
+	@property void selectedElementId(string rhs)
+	{
+		if (rhs == m_selectedElementId)
+			return;
+		m_selectedElementId = rhs;
+		// set content to json
+		EntityElementPair** pair = rhs in m_existingEntities;
+		updateSelectedElementText(pair);
+	}
+
+	private void updateSelectedElementText(EntityElementPair** pair)
+	{
+		if (pair)
+		{
+			dstring newContent = (*pair).parsedJson.toPrettyString().to!dstring;
+			m_observerGui.m_selectedElementText.content = newContent;
+		}
+		else
+			m_observerGui.m_selectedElementText.content = ""d;
 	}
 
 	this(DevObserveSimulatorRes res)
@@ -88,15 +116,8 @@ class SimObserverState: GameState
 		m_camController = new CameraController(Game.worldManager.camCtx.camera);
 		m_overlay = new SimObserverOverlay(m_camController);
 		Game.guiManager.addPanel(new Panel(m_overlay));
+		m_observerGui = new ObserverGui(m_simUniqId, m_overlay);
 
-		Label simIdLabel = builder(new Label()).content("simulator_id: " ~ m_simUniqId).
-			fontSize(SIMID_FONT).fixedSize(vec2i(400, 10)).build;
-
-		Div mainDiv = vDiv([
-			builder(hDiv([simIdLabel, filler()])).fixedSize(
-				vec2i(10, BTN_FONT + 5)).backgroundColor(COLORS.simPanelBgnd).build,
-			filler()]);
-		Game.guiManager.addPanel(new Panel(mainDiv));
 		rebuildFromEmpty(m_firstFullUpdate.allEntities);
 		m_firstFullUpdate.allEntities.length = 0;
 	}
@@ -141,8 +162,10 @@ class SimObserverState: GameState
 				pair.stillExistsFlag = true;
 				pair.record = record;
 				pair.parsedJson = parseJSON(record.stateUpdateJson);
-				trace("pair.overlayElement.updateFromRecord(): ", record);
+				// trace("pair.overlayElement.updateFromRecord(): ", record);
 				pair.overlayElement.updateFromRecord();
+				if (m_selectedElementId == record.id)
+					updateSelectedElementText(pairPtr);
 			}
 		}
 		// build the list of dead entities
@@ -153,6 +176,8 @@ class SimObserverState: GameState
 			{
 				idsToRemove ~= pair.record.id;
 				pair.overlayElement.drop();
+				if (pair.record.id == m_selectedElementId)
+					selectedElementId = null;
 			}
 		}
 		foreach (string id; idsToRemove)
@@ -171,6 +196,60 @@ class SimObserverState: GameState
 }
 
 
+final class ObserverGui
+{
+	private
+	{
+		Button m_abandonBtn;
+		Div m_mainDiv;
+		Div m_headerDiv;
+		Div m_middleScreenDiv;
+		TextBox m_selectedElementText;
+	}
+
+	this(string simulatorId, SimObserverOverlay overlay)
+	{
+		Label simIdLabel = builder(new Label()).content("simulator_id: " ~ simulatorId).
+			fontSize(SIMID_FONT).fixedSize(vec2i(400, 10)).build;
+
+		m_abandonBtn = builder(new Button(ButtonType.ASYNC)).content("X").
+				fixedSize(vec2i(HEADER_FONT + 5, HEADER_FONT + 5)).fontSize(HEADER_FONT).
+				backgroundColor(COLORS.simLaunchButtonBgnd).build;
+		m_abandonBtn.onClick += {
+			startYesNoDialog("Confirm stop observing simulator",
+				{
+					trace("sending request to abort observation");
+					Game.bconm.con.sendMessage(immutable DevStopObservingReq());
+					// this will switch us to devmenu again
+					Game.bconm.con.sendMessage(immutable DevSimulatorsListReq());
+				},
+				{
+					m_abandonBtn.signalClickEnd();
+				},
+				440);
+		};
+
+		m_headerDiv = builder(hDiv([m_abandonBtn, simIdLabel, filler()])).fixedSize(
+				vec2i(10, HEADER_FONT + 5)).backgroundColor(COLORS.simPanelBgnd).build;
+
+		// selected element description
+		m_selectedElementText = builder(new TextBox()).
+			backgroundColor(COLORS.simPanelBgnd).fontSize(EL_DATA_FONT).build;
+		ScrollBar selectedElScrollBar = builder(new ScrollBar(m_selectedElementText)).build;
+		m_middleScreenDiv = builder(hDiv([filler(0.77f), selectedElScrollBar])).build;
+
+		// Stack tacticalScreenStack = builder(new Stack([
+		// 	overlay, m_middleScreenDiv])).fraction(1000.0f).build();
+
+		m_mainDiv = vDiv([
+			m_headerDiv,
+			m_middleScreenDiv]);
+		Game.guiManager.addPanel(new Panel(m_mainDiv));
+	}
+}
+
+
+// TODO: deduplicate with OverlayElementWithHover
 final class SimObserverEl: OverlayElement
 {
 	private
@@ -181,12 +260,14 @@ final class SimObserverEl: OverlayElement
 		Label m_nameLabel;
 		ObservableEntityUpdate* m_record;
 		JSONValue* m_jsonState;
+		RectangleShape m_onHoverRect;
+		bool m_hovered;
 	}
 
 	this(Overlay owner, ObservableEntityUpdate* record, JSONValue* parsedJson)
 	{
 		super(owner);
-		mouseTransparent = true;
+		mouseTransparent = false;
 		m_record = record;
 		m_jsonState = parsedJson;
 		switch (record.entityType)
@@ -218,6 +299,14 @@ final class SimObserverEl: OverlayElement
 		size = cast(vec2i) vec2f(2 * m_shape.radius + 8, 2 * m_shape.radius + 8);
 
 		updateFromRecord();
+
+		m_onHoverRect = Game.simObserverState.m_shapeCache.onHoverRect;
+		onMouseEnter += (o) {
+			trace("mouse entered");
+			m_hovered = true;
+		};
+		onMouseLeave += (o) { m_hovered = false; };
+		onMouseUp += &processMouseUp;
 	}
 
 	void updateFromRecord()
@@ -244,15 +333,30 @@ final class SimObserverEl: OverlayElement
 			position.y + size.y - 1);
 		m_nameLabel.position = vec2i(position.x + size.x / 2 - m_nameLabel.size.x / 2,
 			position.y + size.y + m_prototypeLabel.size.y - 1);
+		if (m_hovered)
+		{
+			m_onHoverRect.center = cast(vec2f) screenPos;
+			m_onHoverRect.size = cast(vec2f) size;
+		}
 	}
 
 	override void draw(Window wnd, long usecsDelta)
 	{
 		super.draw(wnd, usecsDelta);
+		if (m_hovered)
+			m_onHoverRect.render(wnd);
 		m_shape.render(wnd);
 		m_velLine.render(wnd);
 		m_prototypeLabel.draw(wnd, usecsDelta);
 		m_nameLabel.draw(wnd, usecsDelta);
+	}
+
+	private void processMouseUp(int x, int y, sfMouseButton btn)
+	{
+		if (btn == sfMouseLeft && !m_panning)
+		{
+			Game.simObserverState.selectedElementId = m_record.id;
+		}
 	}
 }
 
@@ -262,5 +366,6 @@ final class SimObserverOverlay: WorldSpaceOverlay
 	this(CameraController camCtrl)
 	{
 		super(camCtrl);
+		mouseTransparent = false;
 	}
 }
