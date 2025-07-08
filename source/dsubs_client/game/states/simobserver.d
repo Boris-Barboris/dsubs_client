@@ -91,7 +91,8 @@ final class SimObserverState: GameState
 	{
 		if (pair)
 		{
-			dstring newContent = (*pair).parsedJson.toPrettyString().to!dstring;
+			dstring newContent = ("id: " ~ (*pair).record.id ~ "\n").to!dstring ~
+				(*pair).parsedJson.toPrettyString().to!dstring;
 			m_observerGui.m_selectedElementText.content = newContent;
 		}
 		else
@@ -276,6 +277,14 @@ final class SimObserverEl: OverlayElement
 				m_shape = Game.simObserverState.m_shapeCache.forContactTypeNew(
 					ContactType.submarine);
 				break;
+			case "Torpedo":
+				m_shape = Game.simObserverState.m_shapeCache.forContactTypeNew(
+					ContactType.weapon);
+				break;
+			case "StaticDecoy":
+				m_shape = Game.simObserverState.m_shapeCache.forContactTypeNew(
+					ContactType.decoy);
+				break;
 			default:
 				m_shape = Game.simObserverState.m_shapeCache.forContactTypeNew(
 					ContactType.unknown);
@@ -293,7 +302,10 @@ final class SimObserverEl: OverlayElement
 		m_prototypeLabel.content = m_record.entityType;
 		m_prototypeLabel.size = cast(vec2i) vec2f(m_prototypeLabel.contentWidth + 10,
 				m_prototypeLabel.contentHeight + 2);
-		m_nameLabel.content = m_record.id;
+		if (m_jsonState && "captain" in *m_jsonState)
+			m_nameLabel.content = (*m_jsonState)["captain"].str;
+		else
+			m_nameLabel.content = m_record.id;
 		m_nameLabel.size = cast(vec2i) vec2f(m_nameLabel.contentWidth + 10,
 				m_nameLabel.contentHeight + 2);
 		size = cast(vec2i) vec2f(2 * m_shape.radius + 8, 2 * m_shape.radius + 8);
