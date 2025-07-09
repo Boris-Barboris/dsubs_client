@@ -94,7 +94,8 @@ final class SimObserverState: GameState
 	{
 		if (pair)
 		{
-			dstring newContent = ("id: " ~ (*pair).record.id ~ "\n").to!dstring ~
+			dstring newContent = ("id: " ~ (*pair).record.id ~ "\ntype: " ~
+				(*pair).record.entityType ~ "\n").to!dstring ~
 				(*pair).parsedJson.toPrettyString().to!dstring;
 			m_observerGui.m_selectedElementText.content = newContent;
 		}

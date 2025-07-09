@@ -39,6 +39,7 @@ import dsubs_client.game.entities;
 import dsubs_client.game.gamestate;
 import dsubs_client.game.states.loginscreen;
 import dsubs_client.game.states.simulation;
+import dsubs_client.game.states.devmenu;
 import dsubs_client.game.cic.server;
 import dsubs_client.gui;
 import dsubs_client.input.router: IInputReceiver;
@@ -550,6 +551,8 @@ final class LoadoutState: GameState
 				case ScenarioType.standalone:
 					content = "Singleplayer";
 					break;
+				case ScenarioType.developer:
+					continue;
 			}
 			Label typeLabel = builder(new Label()).fontSize(BTN_FONT).
 				htextAlign(HTextAlign.CENTER).
@@ -625,6 +628,10 @@ final class LoadoutState: GameState
 				Game.bconm.con.sendMessage(immutable DevSimulatorsListReq());
 			};
 			m_footerDiv.setChild(toDevMenuBtn, 1);
+
+			DevMenuState.registerAvailableDevScenarios(
+				res.scenarios.filter!(
+					ascen => ascen.type == ScenarioType.developer).array());
 		}
 
 		availableScenarios = new AvailableScenariosRes();
