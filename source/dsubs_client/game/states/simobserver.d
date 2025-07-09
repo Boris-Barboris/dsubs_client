@@ -144,7 +144,7 @@ final class SimObserverState: GameState
 
 	void handleDevObserverSimulatorUpdateRes(DevObserverSimulatorUpdateRes res)
 	{
-		trace("handleDevObserverSimulatorUpdateRes");
+		// trace("handleDevObserverSimulatorUpdateRes");
 		foreach (EntityElementPair* pair; m_existingEntities.byValue)
 			pair.stillExistsFlag = false;
 		foreach (ObservableEntityUpdate record; res.existingEntities)
@@ -327,11 +327,21 @@ final class ObserverGui
 		});
 
 		timeAccelerationButtons ~= builder(new Button()).fontSize(15).
+			content("x16 speed").build();
+		timeAccelerationButtons[$-1].onClick += () {
+			requestTimeAccelerationFactor(160);
+		};
+		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum5), ()
+		{
+			requestTimeAccelerationFactor(160);
+		});
+
+		timeAccelerationButtons ~= builder(new Button()).fontSize(15).
 			content("x0.5 half").build();
 		timeAccelerationButtons[$-1].onClick += () {
 			requestTimeAccelerationFactor(5);
 		};
-		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum5), ()
+		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum6), ()
 		{
 			requestTimeAccelerationFactor(5);
 		});
