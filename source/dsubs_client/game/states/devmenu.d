@@ -62,13 +62,21 @@ final class DevMenuState: GameState
 		Div m_simListDiv;
 		Div m_footerDiv;
 		ScrollBar m_simListScrollBar;
+		Div m_scenListDiv;
+		ScrollBar m_scenListScrollBar;
 		Panel m_mainPanel;
 		Button m_observeButtonToSignalClickEnd;
+		__gshared AvailableScenario[] g_devScenarios;
 	}
 
 	this(SimulatorRecord[] simulators)
 	{
 		m_simulators = simulators;
+	}
+
+	static void registerAvailableDevScenarios(AvailableScenario[] scenarios)
+	{
+		g_devScenarios = scenarios;
 	}
 
 	override void handleBackendDisconnect()
@@ -92,10 +100,13 @@ final class DevMenuState: GameState
 	{
 		Label simDescription = builder(new Label()).content(
 			simRec.to!string).fontSize(SIM_FONT).build;
+		Button terminateSimBtn = builder(new Button(ButtonType.ASYNC)).
+			content("Terminate").fontSize(SIM_FONT).fixedSize(vec2i(120, 1)).
+			backgroundColor(COLORS.simLaunchButtonBgnd).fontColor(sfBlack).build;
 		Button observeSimBtn = builder(new Button(ButtonType.ASYNC)).
 			content("Observe").fontSize(SIM_FONT).fixedSize(vec2i(100, 1)).
-			backgroundColor(COLORS.simLaunchButtonBgnd).fontColor(sfBlack).build;
-		Div res = builder(hDiv([simDescription, observeSimBtn])).
+			backgroundColor(COLORS.cancelButtonBgnd).fontColor(sfBlack).build;
+		Div res = builder(hDiv([simDescription, terminateSimBtn, observeSimBtn])).
 			fixedSize(vec2i(500, SIM_FONT + 6)).build();
 
 		observeSimBtn.onClick += ()
@@ -103,6 +114,14 @@ final class DevMenuState: GameState
 				info("Requesting observation of simulator ", simRec.uniqId);
 				m_observeButtonToSignalClickEnd = observeSimBtn;
 				Game.bconm.con.sendMessage(immutable DevObserveSimulatorReq(simRec.uniqId));
+			};
+
+		terminateSimBtn.onClick += ()
+			{
+				info("Requesting termination of simulator ", simRec.uniqId);
+				observeSimBtn.pressable = false;
+				Game.bconm.con.sendMessage(
+					immutable DevTerminateSimulatorReq(simRec.uniqId));
 			};
 
 		return res;
@@ -137,6 +156,48 @@ final class DevMenuState: GameState
 		return res;
 	}
 
+	private Div buildAvailableScenarioRow(AvailableScenario scen)
+	{
+		Label scenDescription = builder(new Label()).content(
+			scen.to!string).fontSize(SIM_FONT).build;
+		Button spawnScenBtn = builder(new Button()).
+			content("Spawn").fontSize(SIM_FONT).fixedSize(vec2i(100, 1)).
+			backgroundColor(COLORS.cancelButtonBgnd).fontColor(sfBlack).build;
+		Div res = builder(hDiv([scenDescription, spawnScenBtn])).
+			fixedSize(vec2i(500, SIM_FONT + 6)).build();
+
+		spawnScenBtn.onClick += ()
+			{
+				info("Requesting simulator creation from scenario ", scen.name);
+				Game.bconm.con.sendMessage(immutable DevCreateSimulatorReq(scen.name));
+			};
+
+		return res;
+	}
+
+	private Div buildDevScenarioListUi(AvailableScenario[] scenarios)
+	{
+		GuiElement[] scenarioRows;
+		foreach (AvailableScenario scen; scenarios)
+			scenarioRows ~= buildAvailableScenarioRow(scen);
+		int sbDivHeight = ((SIM_FONT + 6 + 3) * scenarioRows.length).to!int;
+		m_scenListDiv = builder(vDiv(scenarioRows)).
+			fixedSize(vec2i(10, sbDivHeight)).backgroundColor(COLORS.simPanelBgnd).
+			borderWidth(3).build();
+		m_scenListScrollBar = new ScrollBar(m_scenListDiv);
+
+		Label scenListHeaderName = builder(new Label()).content("Dev scenarios:").
+			fontSize(BTN_FONT).fixedSize(vec2i(150, BTN_FONT + 4)).build();
+
+		Div scenListHeader = builder(hDiv([
+			scenListHeaderName, filler()])).
+			fixedSize(vec2i(1, BTN_FONT + 4)).build();
+
+		Div res = builder(vDiv([scenListHeader, m_scenListScrollBar])).
+			build();
+		return res;
+	}
+
 	override void setup()
 	{
 		Button backToLoadountBtn = builder(new Button()).
@@ -149,10 +210,13 @@ final class DevMenuState: GameState
 			fixedSize(vec2i(1, HDR_SIZE)).build();
 
 		Div simListUi = buildSimListUi(m_simulators);
+		Div devScenarioListUi = buildDevScenarioListUi(g_devScenarios);
+		devScenarioListUi.fraction = 0.4f;
 
 		m_topLevelDiv = vDiv([
 			filler(0.05f),
 			simListUi,
+			devScenarioListUi,
 			m_footerDiv
 		]);
 
