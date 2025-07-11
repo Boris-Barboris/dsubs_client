@@ -17,6 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 module dsubs_client.gui.overlay;
 
+import std.algorithm.searching: minElement;
+
 import derelict.sfml2.graphics;
 
 import dsubs_client.common;
@@ -44,6 +46,9 @@ class OverlayElement: GuiElement
 			onHide();
 		m_hidden = rhs;
 	}
+
+	/// Simple click-ordering tuner. Lowest number gets clicked first.
+	public short zOrder = 0;
 
 	protected bool m_panning, m_dragging;
 
@@ -222,6 +227,9 @@ class Overlay: GuiElement
 			return null;
 		if (rectContainsPoint(x, y))
 		{
+			// TODO: fix lookup performance
+			GuiElement[8] foundElements;
+			size_t nEls = 0;
 			// now let's find the element to route event to
 			foreach (OverlayElement el; m_elements.byKey)
 			{
@@ -229,9 +237,16 @@ class Overlay: GuiElement
 				{
 					GuiElement res = el.getFromPoint(evt, x, y);
 					if (res)
-						return res;
+					{
+						foundElements[nEls++] = res;
+						if (nEls >= foundElements.length)
+							break;
+					}
 				}
 			}
+			if (nEls > 0)
+				return foundElements[0..nEls].minElement!(
+					a => cast(OverlayElement) a ? (cast(OverlayElement) a).zOrder : 0);
 			return this;
 		}
 		return null;
