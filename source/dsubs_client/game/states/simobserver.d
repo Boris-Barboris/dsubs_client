@@ -384,10 +384,12 @@ final class SimObserverEl: OverlayElement
 			case "Submarine":
 				m_shape = Game.simObserverState.m_shapeCache.forContactTypeNew(
 					ContactType.submarine);
+				zOrder = -10;
 				break;
 			case "Torpedo":
 				m_shape = Game.simObserverState.m_shapeCache.forContactTypeNew(
 					ContactType.weapon);
+				zOrder = -7;
 				break;
 			case "StaticDecoy":
 				m_shape = Game.simObserverState.m_shapeCache.forContactTypeNew(
@@ -396,6 +398,7 @@ final class SimObserverEl: OverlayElement
 			case "Animal":
 				m_shape = Game.simObserverState.m_shapeCache.forContactTypeNew(
 					ContactType.environment);
+				zOrder = -5;
 				break;
 			case "Hydrophone":
 				m_shape = Game.simObserverState.m_shapeCache.hydrophoneShape;
@@ -404,9 +407,11 @@ final class SimObserverEl: OverlayElement
 			case "PropellerSound":
 			case "PrerecordedSoundSource":
 				m_shape = Game.simObserverState.m_shapeCache.soundSourceShape;
+				zOrder = 3;
 				break;
 			case "SonarPing":
 				m_shape = Game.simObserverState.m_shapeCache.pingShape;
+				zOrder = -6;
 				break;
 			default:
 				m_shape = Game.simObserverState.m_shapeCache.forContactTypeNew(
@@ -442,7 +447,7 @@ final class SimObserverEl: OverlayElement
 
 		m_onHoverRect = Game.simObserverState.m_shapeCache.onHoverRect;
 		onMouseEnter += (o) {
-			trace("mouse entered");
+			// trace("mouse entered");
 			m_hovered = true;
 		};
 		onMouseLeave += (o) { m_hovered = false; };
