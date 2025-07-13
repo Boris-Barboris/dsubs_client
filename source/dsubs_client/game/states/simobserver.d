@@ -26,6 +26,7 @@ import derelict.sfml2.system;
 
 import dsubs_common.api.messages;
 import dsubs_common.api.entities;
+import dsubs_common.api.deventities;
 
 import dsubs_client.common;
 import dsubs_client.core.utils;
@@ -145,6 +146,9 @@ final class SimObserverState: GameState
 	void handleDevObserverSimulatorUpdateRes(DevObserverSimulatorUpdateRes res)
 	{
 		// trace("handleDevObserverSimulatorUpdateRes");
+		foreach (SimulatorLogRecord logRecord; res.logRecords)
+			info("SimulatorLogRecord ", logRecord.entityType, " ", logRecord.entityId, " ",
+				logRecord.message);
 		foreach (EntityElementPair* pair; m_existingEntities.byValue)
 			pair.stillExistsFlag = false;
 		foreach (ObservableEntityUpdate record; res.existingEntities)
@@ -271,6 +275,7 @@ final class ObserverGui
 				vec2i(m_timeAccelBtn.position.x, m_timeAccelBtn.position.y),
 				20);
 		};
+		setupTimeAccelHotkeys();
 
 		m_footerDiv = builder(hDiv([filler(), m_pauseBtn, m_timeAccelBtn])).fixedSize(
 			vec2i(10, HEADER_FONT + 5)).backgroundColor(COLORS.simPanelBgnd).build;
@@ -282,6 +287,34 @@ final class ObserverGui
 		Game.guiManager.addPanel(new Panel(m_mainDiv));
 	}
 
+	private void setupTimeAccelHotkeys()
+	{
+		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum1), ()
+		{
+			requestTimeAccelerationFactor(10);
+		});
+		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum2), ()
+		{
+			requestTimeAccelerationFactor(20);
+		});
+		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum3), ()
+		{
+			requestTimeAccelerationFactor(40);
+		});
+		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum4), ()
+		{
+			requestTimeAccelerationFactor(80);
+		});
+		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum5), ()
+		{
+			requestTimeAccelerationFactor(160);
+		});
+		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum6), ()
+		{
+			requestTimeAccelerationFactor(5);
+		});
+	}
+
 	private Button[] buildTimeAccelButtons()
 	{
 		Button[] timeAccelerationButtons;
@@ -291,60 +324,36 @@ final class ObserverGui
 		timeAccelerationButtons[$-1].onClick += () {
 			requestTimeAccelerationFactor(10);
 		};
-		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum1), ()
-		{
-			requestTimeAccelerationFactor(10);
-		});
 
 		timeAccelerationButtons ~= builder(new Button()).fontSize(15).
 			content("x2 speed").build();
 		timeAccelerationButtons[$-1].onClick += () {
 			requestTimeAccelerationFactor(20);
 		};
-		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum2), ()
-		{
-			requestTimeAccelerationFactor(20);
-		});
 
 		timeAccelerationButtons ~= builder(new Button()).fontSize(15).
 			content("x4 speed").build();
 		timeAccelerationButtons[$-1].onClick += () {
 			requestTimeAccelerationFactor(40);
 		};
-		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum3), ()
-		{
-			requestTimeAccelerationFactor(40);
-		});
 
 		timeAccelerationButtons ~= builder(new Button()).fontSize(15).
 			content("x8 speed").build();
 		timeAccelerationButtons[$-1].onClick += () {
 			requestTimeAccelerationFactor(80);
 		};
-		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum4), ()
-		{
-			requestTimeAccelerationFactor(80);
-		});
 
 		timeAccelerationButtons ~= builder(new Button()).fontSize(15).
 			content("x16 speed").build();
 		timeAccelerationButtons[$-1].onClick += () {
 			requestTimeAccelerationFactor(160);
 		};
-		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum5), ()
-		{
-			requestTimeAccelerationFactor(160);
-		});
 
 		timeAccelerationButtons ~= builder(new Button()).fontSize(15).
 			content("x0.5 half").build();
 		timeAccelerationButtons[$-1].onClick += () {
 			requestTimeAccelerationFactor(5);
 		};
-		Game.hotkeyManager.setHotkey(Hotkey(sfKeyNum6), ()
-		{
-			requestTimeAccelerationFactor(5);
-		});
 
 		return timeAccelerationButtons;
 	}
@@ -364,7 +373,7 @@ final class SimObserverEl: OverlayElement
 	private
 	{
 		CircleShape m_shape;
-		LineShape m_velLine;
+		LineShape m_velLine, m_trackingLine;
 		Label m_prototypeLabel;
 		Label m_nameLabel;
 		ObservableEntityUpdate* m_record;
@@ -407,7 +416,7 @@ final class SimObserverEl: OverlayElement
 			case "PropellerSound":
 			case "PrerecordedSoundSource":
 				m_shape = Game.simObserverState.m_shapeCache.soundSourceShape;
-				zOrder = 3;
+				zOrder = -2;
 				break;
 			case "SonarPing":
 				m_shape = Game.simObserverState.m_shapeCache.pingShape;
@@ -419,6 +428,8 @@ final class SimObserverEl: OverlayElement
 				break;
 		}
 		m_velLine = new LineShape(vec2d(5.0f, 5.0f), vec2d(6.0f, 5.0f), m_shape.borderColor, 2.0f);
+		m_trackingLine = new LineShape(vec2d(0.0f, 0.0f), vec2d(30.0f, 0.0f),
+			sfColor(168, 105, 50, 250), 2.0f);
 
 		m_prototypeLabel = builder(new Label()).fontSize(12).fontColor(sfColor(200, 200, 200, 150)).
 			enableScissorTest(false).htextAlign(HTextAlign.CENTER).vtextAlign(VTextAlign.CENTER).
@@ -454,15 +465,41 @@ final class SimObserverEl: OverlayElement
 		onMouseUp += &processMouseUp;
 	}
 
+	private
+	{
+		bool m_tracking;
+		double m_trackingDir;
+	}
+
 	void updateFromRecord()
 	{
 		assert(m_jsonState);
+		if ("active" in *m_jsonState)
+		{
+			bool shouldBeHidden = !(*m_jsonState)["active"].boolean;
+			if (hidden != shouldBeHidden)
+				hidden = shouldBeHidden;
+		}
 		if ("dead" !in *m_jsonState)
 			return;
 		if ((*m_jsonState)["dead"].boolean)
 		{
 			m_shape.borderColor = sfColor(100, 100, 100, 255);
 			m_velLine.color = sfColor(100, 100, 100, 255);
+		}
+		if (m_record.entityType == "Torpedo")
+		{
+			if (m_jsonState && "wireGuidanceFullState" in *m_jsonState)
+			{
+				JSONValue wireGuidanceState = (*m_jsonState)["wireGuidanceFullState"];
+				if (wireGuidanceState["tracking"].boolean)
+				{
+					m_tracking = true;
+					m_trackingDir = wireGuidanceState["trackingDir"].floating;
+				}
+				else
+					m_tracking = false;
+			}
 		}
 	}
 
@@ -483,6 +520,12 @@ final class SimObserverEl: OverlayElement
 			position.y + size.y - 1);
 		m_nameLabel.position = vec2i(position.x + size.x / 2 - m_nameLabel.size.x / 2,
 			position.y + size.y + m_prototypeLabel.size.y - 1);
+		if (m_tracking)
+		{
+			m_trackingLine.transform.position = vec2d(screenPos.x, -screenPos.y);
+			double trackRot = owner.world2screenRot(m_trackingDir);
+			m_trackingLine.transform.rotation = trackRot + PI_2;
+		}
 		if (m_hovered)
 		{
 			m_onHoverRect.center = cast(vec2f) screenPos;
@@ -497,6 +540,8 @@ final class SimObserverEl: OverlayElement
 			m_onHoverRect.render(wnd);
 		m_shape.render(wnd);
 		m_velLine.render(wnd);
+		if (m_tracking)
+			m_trackingLine.render(wnd);
 		m_prototypeLabel.draw(wnd, usecsDelta);
 		m_nameLabel.draw(wnd, usecsDelta);
 	}
