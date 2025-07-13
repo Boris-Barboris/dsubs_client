@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 module dsubs_client.gui.overlay;
 
+import std.algorithm: min, max;
 import std.algorithm.searching: minElement;
 
 import derelict.sfml2.graphics;
@@ -47,8 +48,13 @@ class OverlayElement: GuiElement
 		m_hidden = rhs;
 	}
 
+	// m_zOrderDeboost is used to allow cycling of overlapping overlay elements by simply
+	// clicking on the same spot. Clicked element gets a temporary deboost to it's zOrder.
+	private int m_zOrder, m_zOrderDeboost;
+
 	/// Simple click-ordering tuner. Lowest number gets clicked first.
-	public short zOrder = 0;
+	@property int zOrder() const { return m_zOrder + m_zOrderDeboost; };
+	@property void zOrder(int rhs) { m_zOrder = rhs; }
 
 	protected bool m_panning, m_dragging;
 
@@ -108,6 +114,7 @@ class OverlayElement: GuiElement
 			if (!m_dragging)
 				returnMouseFocus();
 		}
+		m_zOrderDeboost = min(200, m_zOrderDeboost + 200);
 	}
 
 	private void processMouseScroll(int x, int y, float delta)
@@ -139,6 +146,12 @@ class OverlayElement: GuiElement
 		if (evt.type == sfEvtMouseWheelScrolled)
 			return null;
 		return super.getFromPoint(evt, x, y);
+	}
+
+	override void draw(Window wnd, long usecsDelta)
+	{
+		super.draw(wnd, usecsDelta);
+		m_zOrderDeboost = max(0, m_zOrderDeboost - 1);
 	}
 
 	/// Called by overlay when new coordinates of all tracked objects and camera
