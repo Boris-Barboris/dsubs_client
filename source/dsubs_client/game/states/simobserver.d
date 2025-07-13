@@ -403,6 +403,7 @@ final class SimObserverEl: OverlayElement
 			case "StaticDecoy":
 				m_shape = Game.simObserverState.m_shapeCache.forContactTypeNew(
 					ContactType.decoy);
+				zOrder = -5;
 				break;
 			case "Animal":
 				m_shape = Game.simObserverState.m_shapeCache.forContactTypeNew(
@@ -415,7 +416,14 @@ final class SimObserverEl: OverlayElement
 			case "SoundSource":
 			case "PropellerSound":
 			case "PrerecordedSoundSource":
-				m_shape = Game.simObserverState.m_shapeCache.soundSourceShape;
+				// cloning because we need to set size per-shape
+				m_shape = Game.simObserverState.m_shapeCache.soundSourceShape.clone();
+				// soundsource size
+				if ("radius" in *m_jsonState)
+				{
+					m_shape.radius = m_shape.radius +
+						(*m_jsonState)["radius"].get!float / 5.0f;
+				}
 				zOrder = -2;
 				break;
 			case "SonarPing":
@@ -425,7 +433,6 @@ final class SimObserverEl: OverlayElement
 			default:
 				m_shape = Game.simObserverState.m_shapeCache.forContactTypeNew(
 					ContactType.unknown);
-				break;
 		}
 		m_velLine = new LineShape(vec2d(5.0f, 5.0f), vec2d(6.0f, 5.0f), m_shape.borderColor, 2.0f);
 		m_trackingLine = new LineShape(vec2d(0.0f, 0.0f), vec2d(30.0f, 0.0f),
@@ -495,7 +502,7 @@ final class SimObserverEl: OverlayElement
 				if (wireGuidanceState["tracking"].boolean)
 				{
 					m_tracking = true;
-					m_trackingDir = wireGuidanceState["trackingDir"].floating;
+					m_trackingDir = wireGuidanceState["trackingDir"].get!float;
 				}
 				else
 					m_tracking = false;
@@ -505,6 +512,7 @@ final class SimObserverEl: OverlayElement
 
 	override void onPreDraw()
 	{
+		assert(m_velLine);
 		// TODO: kinematic interpolation
 		vec2d worldPos = cast(vec2d) m_record.transformSnapshot.position;
 		vec2d screenPos = owner.world2screenPos(worldPos);

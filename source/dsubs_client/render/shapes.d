@@ -40,6 +40,8 @@ abstract class Shape
 	void render(Window wnd);
 	void render(Window wnd, const mat3x3d trans);
 	void render(Window wnd, const sfTransform trans);
+
+	Shape clone();
 }
 
 
@@ -70,6 +72,14 @@ final class ShapeComposite: Shape
 		foreach (shape; m_shapes)
 			shape.render(wnd, trans);
 	}
+
+	override ShapeComposite clone()
+	{
+		Shape[] clones;
+		foreach (shape; m_shapes)
+			clones ~= shape.clone();
+		return new ShapeComposite(clones);
+	}
 }
 
 
@@ -88,6 +98,11 @@ final class ConvexShape: Shape
 		sfConvexShape_setFillColor(m_shape, fillColor);
 		sfConvexShape_setOutlineColor(m_shape, borderColor);
 		sfConvexShape_setOutlineThickness(m_shape, borderWidth);
+	}
+
+	override Shape clone()
+	{
+		throw new Exception("unimplemented");
 	}
 
 	~this()
@@ -130,6 +145,15 @@ final class CircleShape: Shape
 		sfCircleShape_setOutlineColor(m_shape, color);
 		sfCircleShape_setOutlineThickness(m_shape, borderW);
 		sfCircleShape_setOrigin(m_shape, sfVector2f(radius, radius));
+	}
+
+	override CircleShape clone()
+	{
+		CircleShape res =
+			new CircleShape(this.radius, this.vertexCount.to!int, this.borderColor,
+				this.borderWidth);
+		res.fillColor = this.fillColor;
+		return res;
 	}
 
 	~this()
@@ -240,6 +264,11 @@ final class RectangleShape: Shape
 		sfRectangleShape_setOutlineColor(m_shape, borderCol);
 		sfRectangleShape_setFillColor(m_shape, fillColor);
 		sfRectangleShape_setOutlineThickness(m_shape, borderW);
+	}
+
+	override Shape clone()
+	{
+		throw new Exception("unimplemented");
 	}
 
 	@property vec2f position() const
@@ -359,6 +388,11 @@ final class LineShape: Shape
 	~this()
 	{
 		sfRectangleShape_destroy(m_shape);
+	}
+
+	override Shape clone()
+	{
+		throw new Exception("unimplemented");
 	}
 
 	void setPoints(vec2d p1, vec2d p2, bool invertY = false)
