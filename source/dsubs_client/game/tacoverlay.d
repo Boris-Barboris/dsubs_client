@@ -99,6 +99,8 @@ final class ContactOverlayShapeCahe
 		// ]);
 		m_hydrophoneShape = new CircleShape(7.0f, 20, sfColor(255, 255, 255, 180), 2.0f);
 
+		m_aiShape = new CircleShape(9.0f, 16, sfColor(150, 150, 150, 150), 2.0f);
+
 		// m_activeSonarShape = new ShapeComposite([
 		// 	new CircleShape(10, 20, sfWhite, 3.0f),
 		// 	new LineShape(vec2d(-10.0f, 10.0f), vec2d(10.0f, 10.0f), sfWhite, 2.0f),
@@ -136,6 +138,7 @@ final class ContactOverlayShapeCahe
 	mixin Readonly!(CircleShape, "hydrophoneShape");
 	mixin Readonly!(CircleShape, "activeSonarShape");
 	mixin Readonly!(CircleShape, "pingShape");
+	mixin Readonly!(CircleShape, "aiShape");
 
 	// https://stackoverflow.com/a/8509802/3084875
 	static sfColor rotateColor(sfColor color, float hue)

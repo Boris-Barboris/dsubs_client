@@ -95,6 +95,7 @@ final class SimObserverState: GameState
 	{
 		if (pair)
 		{
+			// FIXME: indent 2 would be better but 4 is hardcoded in Phobos =(
 			dstring newContent = ("id: " ~ (*pair).record.id ~ "\ntype: " ~
 				(*pair).record.entityType ~ "\n").to!dstring ~
 				(*pair).parsedJson.toPrettyString().to!dstring;
@@ -380,6 +381,7 @@ final class SimObserverEl: OverlayElement
 		JSONValue* m_jsonState;
 		RectangleShape m_onHoverRect;
 		bool m_hovered;
+		bool m_isAi;
 	}
 
 	this(Overlay owner, ObservableEntityUpdate* record, JSONValue* parsedJson)
@@ -413,6 +415,11 @@ final class SimObserverEl: OverlayElement
 				break;
 			case "Hydrophone":
 				m_shape = Game.simObserverState.m_shapeCache.hydrophoneShape;
+				break;
+			case "BotCaptain":
+			case "AICrew":
+				m_shape = Game.simObserverState.m_shapeCache.aiShape;
+				m_isAi = true;
 				break;
 			case "SoundSource":
 			case "PropellerSound":
@@ -449,7 +456,12 @@ final class SimObserverEl: OverlayElement
 		m_prototypeLabel.content = m_record.entityType;
 		m_prototypeLabel.size = cast(vec2i) vec2f(m_prototypeLabel.contentWidth + 10,
 				m_prototypeLabel.contentHeight + 2);
-		if (m_jsonState && "captain" in *m_jsonState)
+		if (m_jsonState && m_isAi)
+		{
+			m_nameLabel.content = "AI";
+			m_nameLabel.fontColor = m_shape.borderColor;
+		}
+		else if (m_jsonState && "captain" in *m_jsonState)
 			m_nameLabel.content = (*m_jsonState)["captain"].str;
 		else if (m_jsonState && "name" in *m_jsonState)
 			m_nameLabel.content = (*m_jsonState)["name"].str;
@@ -524,11 +536,20 @@ final class SimObserverEl: OverlayElement
 		m_shape.center = screenPosF;
 		vec2d velYInv = cast(vec2d) m_record.transformSnapshot.velocity;
 		velYInv.y = - velYInv.y;
-		m_velLine.setPoints(screenPos, screenPos + velYInv, true);
+		if (!m_isAi)
+			m_velLine.setPoints(screenPos, screenPos + velYInv, true);
 		m_prototypeLabel.position = vec2i(position.x + size.x / 2 - m_prototypeLabel.size.x / 2,
 			position.y + size.y - 1);
-		m_nameLabel.position = vec2i(position.x + size.x / 2 - m_nameLabel.size.x / 2,
-			position.y + size.y + m_prototypeLabel.size.y - 1);
+		if (m_isAi)
+		{
+			m_nameLabel.position = vec2i(position.x + size.x / 2 - m_nameLabel.size.x / 2,
+				position.y + size.y / 2 - m_nameLabel.size.y / 2);
+		}
+		else
+		{
+			m_nameLabel.position = vec2i(position.x + size.x / 2 - m_nameLabel.size.x / 2,
+				position.y + size.y + m_prototypeLabel.size.y - 1);
+		}
 		if (m_tracking)
 		{
 			m_trackingLine.transform.position = vec2d(screenPos.x, -screenPos.y);
@@ -548,7 +569,8 @@ final class SimObserverEl: OverlayElement
 		if (m_hovered)
 			m_onHoverRect.render(wnd);
 		m_shape.render(wnd);
-		m_velLine.render(wnd);
+		if (!m_isAi)
+			m_velLine.render(wnd);
 		if (m_tracking)
 			m_trackingLine.render(wnd);
 		m_prototypeLabel.draw(wnd, usecsDelta);
