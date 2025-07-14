@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 module dsubs_client.game.states.simobserver;
 
 import std.algorithm: min;
+import std.array: replicate;
 import std.math: floor;
 import std.json;
 
@@ -50,6 +51,7 @@ private
 	enum int EL_DATA_FONT = 12;
 	enum int BTN_FONT = 20;
 	enum int BIG_BTN_FONT = 24;
+	enum float BT_VIEWER_FRACTION = 0.27f;
 }
 
 
@@ -88,21 +90,61 @@ final class SimObserverState: GameState
 		m_selectedElementId = rhs;
 		// set content to json
 		EntityElementPair** pair = rhs in m_existingEntities;
+		updateBehaviourTreeElement(pair);
 		updateSelectedElementText(pair);
 	}
 
 	private void updateSelectedElementText(EntityElementPair** pair)
 	{
+		static JSONValue filterOutBts(JSONValue j)
+		{
+			JSONValue[string] resMap;
+			foreach (pair; j.object.byKeyValue())
+			{
+				if (pair.key != "helmsman" && pair.key != "acoustic" &&
+					pair.key != "captain")
+				{
+					resMap[pair.key] = pair.value;
+				}
+			}
+			return JSONValue(resMap);
+		}
+
 		if (pair)
 		{
+			JSONValue jsonToPrint = (*pair).parsedJson;
+			if ((*pair).record.entityType == "AICrew")
+				jsonToPrint = filterOutBts(jsonToPrint);
 			// FIXME: indent 2 would be better but 4 is hardcoded in Phobos =(
 			dstring newContent = ("id: " ~ (*pair).record.id ~ "\ntype: " ~
 				(*pair).record.entityType ~ "\n").to!dstring ~
-				(*pair).parsedJson.toPrettyString().to!dstring;
+				jsonToPrint.toPrettyString().to!dstring;
 			m_observerGui.m_selectedElementText.content = newContent;
 		}
 		else
 			m_observerGui.m_selectedElementText.content = ""d;
+	}
+
+	private void updateBehaviourTreeElement(EntityElementPair** pair)
+	{
+		if (pair)
+		{
+			EntityElementPair* pairPtr = *pair;
+			if (pairPtr.record.entityType == "AICrew")
+			{
+				JSONValue[] btJsons = [(*pair).parsedJson["captain"]];
+				if ("helmsman" in (*pair).parsedJson)
+					btJsons ~= (*pair).parsedJson["helmsman"];
+				if ("acoustic" in (*pair).parsedJson)
+					btJsons ~= (*pair).parsedJson["acoustic"];
+				m_observerGui.m_btViewer.displayBt(btJsons);
+				m_observerGui.m_middleScreenDiv.setChild(m_observerGui.m_btViewer.root, 0);
+			}
+			else
+				m_observerGui.m_middleScreenDiv.setChild(filler(BT_VIEWER_FRACTION), 0);
+		}
+		else
+			m_observerGui.m_middleScreenDiv.setChild(filler(BT_VIEWER_FRACTION), 0);
 	}
 
 	this(DevObserveSimulatorRes res)
@@ -175,7 +217,10 @@ final class SimObserverState: GameState
 				// trace("pair.overlayElement.updateFromRecord(): ", record);
 				pair.overlayElement.updateFromRecord();
 				if (m_selectedElementId == record.id)
+				{
 					updateSelectedElementText(pairPtr);
+					updateBehaviourTreeElement(pairPtr);
+				}
 			}
 		}
 		// build the list of dead entities
@@ -218,6 +263,7 @@ final class ObserverGui
 		TextBox m_selectedElementText;
 		Button m_pauseBtn;
 		Button m_timeAccelBtn;
+		BehavourTreeViewer m_btViewer;
 	}
 
 	this(string simulatorId, SimObserverOverlay overlay)
@@ -249,7 +295,12 @@ final class ObserverGui
 		m_selectedElementText = builder(new TextBox()).fontSize(EL_DATA_FONT).build;
 		ScrollBar selectedElScrollBar = builder(new ScrollBar(m_selectedElementText)).
 			backgroundColor(COLORS.simPanelBgnd).build;
-		m_middleScreenDiv = builder(hDiv([filler(0.77f), selectedElScrollBar])).build;
+
+		// bt viewer on the left
+		m_btViewer = new BehavourTreeViewer();
+		m_btViewer.root.fraction = BT_VIEWER_FRACTION;
+		m_middleScreenDiv = builder(hDiv([
+			filler(BT_VIEWER_FRACTION), filler(0.50f), selectedElScrollBar])).build;
 
 		// footer stuff
 
@@ -605,5 +656,82 @@ final class SimObserverOverlay: WorldSpaceOverlay
 		super.draw(wnd, usecsDelta);
 		m_mapGrid.rebuild(this);
 		m_mapGrid.draw(wnd);
+	}
+}
+
+
+final class BehavourTreeViewer
+{
+	private
+	{
+		ScrollBar m_scrollBar;
+		Div m_mainDiv;
+	}
+
+	@property GuiElement root() { return m_scrollBar; }
+
+	this()
+	{
+		m_mainDiv = vDiv([new Label()]);
+		m_mainDiv.layoutType = LayoutType.CONTENT;
+		m_scrollBar = new ScrollBar(m_mainDiv);
+	}
+
+	void displayBt(JSONValue[] btJsons)
+	{
+		GuiElement[] rows;
+		foreach (btJson; btJsons)
+			buildRowsForBtNode(btJson, rows, 0);
+		for (size_t i = 0; i < rows.length; i++)
+		{
+			if (m_mainDiv.children.length <= i)
+				m_mainDiv.addChild(rows[i], i);
+			else
+				m_mainDiv.setChild(rows[i], i);
+		}
+		if (rows.length < m_mainDiv.children.length)
+		{
+			for (size_t i = m_mainDiv.children.length - 1; i >= rows.length; i--)
+				m_mainDiv.removeChildAt(i);
+		}
+	}
+
+	private static string tabulate(int tabCount)
+	{
+		return "  ".replicate(tabCount);
+	}
+
+	private void buildRowsForBtNode(JSONValue nodeJson, ref GuiElement[] rows, int depth = 0)
+	{
+		string content = tabulate(depth) ~ nodeJson["description"].str;
+		Label nodeLabel = builder(new Label()).fontSize(12).
+			fixedSize(vec2i(1, 20)).content(content).build;
+		if (!nodeJson["wasExecuted"].boolean)
+			nodeLabel.backgroundColor = sfTransparent;
+		else
+		{
+			switch (nodeJson["execResult"].str)
+			{
+				case "running":
+					nodeLabel.backgroundColor = sfColor(255, 255, 150, 50);
+					break;
+				case "success":
+					nodeLabel.backgroundColor = sfColor(150, 255, 150, 50);
+					break;
+				case "failure":
+					nodeLabel.backgroundColor = sfColor(255, 150, 150, 50);
+					break;
+				default:
+					nodeLabel.backgroundColor = sfTransparent;
+			}
+		}
+		rows ~= nodeLabel;
+		if ("children" in nodeJson)
+		{
+			foreach (JSONValue child; nodeJson["children"].array)
+			{
+				buildRowsForBtNode(child, rows, depth + 1);
+			}
+		}
 	}
 }
