@@ -385,6 +385,7 @@ final class SimObserverEl: OverlayElement
 	this(Overlay owner, ObservableEntityUpdate* record, JSONValue* parsedJson)
 	{
 		super(owner);
+		scope(failure) drop();
 		mouseTransparent = false;
 		m_record = record;
 		m_jsonState = parsedJson;
